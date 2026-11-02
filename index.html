@@ -28,9 +28,9 @@ button.secondary { background:var(--card); border:1px solid var(--border); }
 .status-dot.triggered { background:var(--green); }
 .status-dot.emerging { background:var(--yellow); }
 .status-dot.none { background:var(--muted); }
-.log-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
-.log-table th, .log-table td { text-align:left; padding:6px; border-bottom:1px solid var(--border); }
-.form-row { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+.log-table { width:100%; border-collapse:collapse; font-size:0.75rem; }
+.log-table th, .log-table td { text-align:left; padding:5px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.form-row { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
 input, select { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px; font-size:0.85rem; }
 .tabs { display:flex; gap:2px; margin-bottom:14px; }
 .tab { padding:6px 12px; background:transparent; border:none; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; font-size:0.85rem; }
@@ -50,13 +50,25 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 .cross { color:var(--red); }
 .partial { color:var(--yellow); }
 .top-coin { font-weight:700; }
+.pl-pos { color:var(--green); }
+.pl-neg { color:var(--red); }
 </style>
 </head>
 <body>
 <div class="header"><div><h1>Crypto Strategy Tracker</h1><div class="subtitle">15/40 SMA + 3-day confirm + 200 SMA + 100 SMA rising (15d) + BTC filter</div></div><div><button onclick="refresh()">Refresh</button> <button class="secondary" onclick="exportLog()">Export</button></div></div>
 <div class="tabs"><button class="tab active" onclick="showTab('signals')">Signals</button><button class="tab" onclick="showTab('log')">Trade Log</button><button class="tab" onclick="showTab('settings')">Settings</button></div>
 <div id="signals" class="panel active"><div class="stats" id="stats"></div><div class="grid"><div class="card"><h2>Triggered <span class="badge green" id="triggered-count">0</span></h2><div id="triggered-list"><div class="loading">Loading...</div></div></div><div class="card"><h2>Emerging <span class="badge yellow" id="emerging-count">0</span></h2><div id="emerging-list"><div class="loading">Loading...</div></div></div></div><div class="card"><h2>Condition Status</h2><div style="overflow-x:auto"><table class="cond-table" id="cond-table"><thead><tr><th>Coin</th><th>Price</th><th>15>40</th><th>Days</th><th>>200</th><th>100↑</th><th>BTC</th><th>Status</th></tr></thead><tbody id="cond-body"></tbody></table></div></div></div>
-<div id="log" class="panel"><div class="card"><h2>Log a Trade</h2><div class="form-row"><select id="log-coin"></select><select id="log-action"><option value="entry">Entry</option><option value="exit">Exit</option></select><input type="number" id="log-price" placeholder="Price" step="0.01"><input type="text" id="log-note" placeholder="Note"><button onclick="addLog()">Add</button></div><table class="log-table"><thead><tr><th>Date</th><th>Coin</th><th>Action</th><th>Price</th><th>Note</th><th></th></tr></thead><tbody id="log-body"></tbody></table></div></div>
+<div id="log" class="panel"><div class="card"><h2>Log a Trade</h2>
+<div class="form-row">
+  <select id="log-coin"></select>
+  <input type="number" id="log-entry" placeholder="Entry Price" step="0.01" style="width:110px">
+  <input type="number" id="log-exit" placeholder="Exit Price" step="0.01" style="width:110px">
+  <input type="number" id="log-atr" placeholder="2.5x ATR" step="0.01" style="width:100px">
+  <input type="number" id="log-size" placeholder="Size ($)" step="0.01" style="width:90px">
+  <input type="text" id="log-note" placeholder="Note" style="width:120px">
+  <button onclick="addLog()">Add</button>
+</div>
+<div style="overflow-x:auto"><table class="log-table"><thead><tr><th>Date</th><th>Coin</th><th>Entry</th><th>Exit</th><th>2.5x ATR</th><th>Size</th><th>P/L</th><th>P/L %</th><th>Note</th><th></th></tr></thead><tbody id="log-body"></tbody></table></div></div></div>
 <div id="settings" class="panel"><div class="card"><h2>Settings</h2><div class="form-row"><label>Fast: <input type="number" id="set-fast" value="15" style="width:50px"></label><label>Slow: <input type="number" id="set-slow" value="40" style="width:50px"></label><label>Confirm: <input type="number" id="set-confirm" value="3" style="width:40px"></label><label>200 SMA: <input type="checkbox" id="set-sma200" checked></label></div><button onclick="saveSettings()">Save</button></div></div>
 <script>
 const TOP13=['BTC','ETH','BNB','SOL','XRP','ADA','DOGE','AVAX','DOT','LINK','ATOM','LTC','BCH'];
@@ -103,10 +115,52 @@ async function refresh(){
   document.getElementById('cond-body').innerHTML=r.map(x=>`<tr><td class="${isTop(x.symbol)?'top-coin':''}">${x.symbol}${isTop(x.symbol)?' <span class="badge top">TOP</span>':''}</td><td>$${x.price?.toFixed(2)||'-'}</td><td class="${x.maOk?'check':'cross'}">${x.maOk?'\u2713':'\u2717'}</td><td class="${x.days>=settings.confirm?'check':x.days>0?'partial':'cross'}">${x.days}/${settings.confirm}</td><td class="${x.above200?'check':'cross'}">${settings.sma200?(x.above200?'\u2713':'\u2717'):'-'}</td><td class="${x.slope100?'check':'cross'}">${x.slope100?'\u2713':'\u2717'}</td><td class="${x.btc?'check':'cross'}">${x.btc?'\u2713':'\u2717'}</td><td><span class="badge ${x.status==='triggered'?'green':x.status==='emerging'?'yellow':''}">${x.status}</span></td></tr>`).join('');
   document.getElementById('log-coin').innerHTML=COINS.map(c=>`<option value="${c.replace('USDT','')}">${c.replace('USDT','')}</option>`).join('');
 }
-function addLog(){log.unshift({date:new Date().toISOString().slice(0,10),coin:document.getElementById('log-coin').value,action:document.getElementById('log-action').value,price:parseFloat(document.getElementById('log-price').value)||0,note:document.getElementById('log-note').value});localStorage.setItem('tradeLog',JSON.stringify(log));document.getElementById('log-price').value='';document.getElementById('log-note').value='';renderLog();}
-function renderLog(){document.getElementById('log-body').innerHTML=log.map((e,i)=>`<tr><td>${e.date}</td><td>${e.coin}</td><td><span class="badge ${e.action==='entry'?'green':''}">${e.action}</span></td><td>$${e.price}</td><td>${e.note||''}</td><td><button class="secondary" onclick="deleteLog(${i})" style="padding:4px 8px">\u00d7</button></td></tr>`).join('');}
+function addLog(){
+  const entry=parseFloat(document.getElementById('log-entry').value)||0;
+  const exit=parseFloat(document.getElementById('log-exit').value)||0;
+  const atr=parseFloat(document.getElementById('log-atr').value)||0;
+  const size=parseFloat(document.getElementById('log-size').value)||0;
+  const pl = (exit && entry) ? (exit - entry) * (size / entry) : 0;
+  const plPct = (exit && entry) ? ((exit - entry) / entry * 100) : 0;
+  log.unshift({
+    date:new Date().toISOString().slice(0,10),
+    coin:document.getElementById('log-coin').value,
+    entry, exit, atr, size, pl, plPct,
+    note:document.getElementById('log-note').value
+  });
+  localStorage.setItem('tradeLog',JSON.stringify(log));
+  document.getElementById('log-entry').value='';
+  document.getElementById('log-exit').value='';
+  document.getElementById('log-atr').value='';
+  document.getElementById('log-size').value='';
+  document.getElementById('log-note').value='';
+  renderLog();
+}
+function renderLog(){
+  document.getElementById('log-body').innerHTML=log.map((e,i)=>{
+    const plClass = e.pl>0?'pl-pos':e.pl<0?'pl-neg':'';
+    return `<tr>
+      <td>${e.date}</td>
+      <td>${e.coin}</td>
+      <td>$${e.entry?.toFixed(2)||'-'}</td>
+      <td>$${e.exit?.toFixed(2)||'-'}</td>
+      <td>$${e.atr?.toFixed(2)||'-'}</td>
+      <td>$${e.size?.toFixed(0)||'-'}</td>
+      <td class="${plClass}">$${e.pl?.toFixed(2)||'0'}</td>
+      <td class="${plClass}">${e.plPct?.toFixed(1)||'0'}%</td>
+      <td>${e.note||''}</td>
+      <td><button class="secondary" onclick="deleteLog(${i})" style="padding:4px 8px">\u00d7</button></td>
+    </tr>`;
+  }).join('');
+}
 function deleteLog(i){log.splice(i,1);localStorage.setItem('tradeLog',JSON.stringify(log));renderLog();}
-function exportLog(){const csv='Date,Coin,Action,Price,Note\n'+log.map(e=>`${e.date},${e.coin},${e.action},${e.price},"${e.note||''}"`).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='trade_log.csv';a.click();}
+function exportLog(){
+  const csv='Date,Coin,Entry,Exit,ATR,Size,PL,PL_Pct,Note\n'+log.map(e=>`${e.date},${e.coin},${e.entry||''},${e.exit||''},${e.atr||''},${e.size||''},${e.pl||''},${e.plPct||''},"${e.note||''}"`).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='trade_log.csv';
+  a.click();
+}
 function saveSettings(){settings.fast=parseInt(document.getElementById('set-fast').value)||15;settings.slow=parseInt(document.getElementById('set-slow').value)||40;settings.confirm=parseInt(document.getElementById('set-confirm').value)||3;settings.sma200=document.getElementById('set-sma200').checked;localStorage.setItem('settings',JSON.stringify(settings));refresh();}
 const saved=localStorage.getItem('settings');if(saved)settings=JSON.parse(saved);refresh();
 </script>
