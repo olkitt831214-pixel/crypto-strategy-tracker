@@ -21,6 +21,7 @@ button.secondary { background:var(--card); border:1px solid var(--border); }
 .badge.yellow { background:rgba(234,179,8,0.2); color:var(--yellow); }
 .badge.red { background:rgba(239,68,68,0.2); color:var(--red); }
 .badge.top { background:rgba(99,102,241,0.25); color:#a5b4fc; margin-left:6px; }
+.badge.priority { background:rgba(34,197,94,0.3); color:var(--green); font-weight:700; }
 .coin-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); }
 .coin-name { font-weight:600; }
 .coin-detail { font-size:0.75rem; color:var(--muted); }
@@ -57,7 +58,7 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 <body>
 <div class="header"><div><h1>Crypto Strategy Tracker</h1><div class="subtitle">15/40 SMA + 3-day confirm + 200 SMA + 100 SMA rising (15d) + BTC filter</div></div><div><button onclick="refresh()">Refresh</button> <button class="secondary" onclick="exportLog()">Export</button></div></div>
 <div class="tabs"><button class="tab active" onclick="showTab('signals')">Signals</button><button class="tab" onclick="showTab('log')">Trade Log</button><button class="tab" onclick="showTab('settings')">Settings</button></div>
-<div id="signals" class="panel active"><div class="stats" id="stats"></div><div class="grid"><div class="card"><h2>Triggered <span class="badge green" id="triggered-count">0</span></h2><div id="triggered-list"><div class="loading">Loading...</div></div></div><div class="card"><h2>Emerging <span class="badge yellow" id="emerging-count">0</span></h2><div id="emerging-list"><div class="loading">Loading...</div></div></div></div><div class="card"><h2>Condition Status</h2><div style="overflow-x:auto"><table class="cond-table" id="cond-table"><thead><tr><th>Coin</th><th>Price</th><th>15>40</th><th>Days</th><th>>200</th><th>100↑</th><th>BTC</th><th>Status</th></tr></thead><tbody id="cond-body"></tbody></table></div></div></div>
+<div id="signals" class="panel active"><div class="stats" id="stats"></div><div class="grid"><div class="card"><h2>Triggered (ranked by 30d ROC) <span class="badge green" id="triggered-count">0</span></h2><div id="triggered-list"><div class="loading">Loading...</div></div></div><div class="card"><h2>Emerging (ranked by 30d ROC) <span class="badge yellow" id="emerging-count">0</span></h2><div id="emerging-list"><div class="loading">Loading...</div></div></div></div><div class="card"><h2>Condition Status</h2><div style="overflow-x:auto"><table class="cond-table" id="cond-table"><thead><tr><th>Coin</th><th>Price</th><th>15>40</th><th>Days</th><th>>200</th><th>100↑</th><th>BTC</th><th>30d ROC</th><th>Priority</th><th>Status</th></tr></thead><tbody id="cond-body"></tbody></table></div></div></div>
 <div id="log" class="panel"><div class="card"><h2>Log a Trade</h2>
 <div class="form-row">
   <select id="log-coin"></select>
@@ -77,6 +78,12 @@ let settings={fast:15,slow:40,confirm:3,sma200:true}, log=JSON.parse(localStorag
 function isTop(symbol){return TOP13.includes(symbol);}
 function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');event.target.classList.add('active');if(id==='log')renderLog();}
 function sma(a,n){if(a.length<n)return null;return a.slice(-n).reduce((x,y)=>x+y,0)/n;}
+function roc30(closes){
+  if(!closes || closes.length<31) return 0;
+  const curr=closes.at(-1);
+  const prev=closes[closes.length-31];
+  return prev ? (curr/prev - 1) : 0;
+}
 function isRising(closes, period, lookback){
   if(closes.length < period + lookback) return false;
   const curr = sma(closes, period);
@@ -84,11 +91,12 @@ function isRising(closes, period, lookback){
   return curr && prev && curr > prev;
 }
 function checkSignal(c,f,s,conf,u200){
-  if(c.length<Math.max(s,200,100)+conf)return{status:'none',days:0,maOk:false,above200:false,slope100:false};
+  if(c.length<Math.max(s,200,100)+conf)return{status:'none',days:0,maOk:false,above200:false,slope100:false,roc:0};
   const price=c.at(-1), sFast=sma(c,f), sSlow=sma(c,s), s200=sma(c,200);
   const maOk=sFast&&sSlow&&sFast>sSlow;
   const above200=!u200||(s200&&price>s200);
   const slope100=isRising(c,100,15);
+  const roc=roc30(c);
   let d=0;
   for(let i=0;i<conf;i++){
     const idx=c.length-1-i, ff=sma(c.slice(0,idx+1),f), ss=sma(c.slice(0,idx+1),s), p=c[idx], s2=sma(c,200);
@@ -99,20 +107,25 @@ function checkSignal(c,f,s,conf,u200){
   let status='none';
   if(d>=conf && btc && slope100)status='triggered';
   else if(d>=conf-1 && d>0 && slope100)status='emerging';
-  return{status,days:d,price,maOk,above200,slope100,btc};
+  return{status,days:d,price,maOk,above200,slope100,btc,roc};
 }
 async function fetchCoin(s){return(await(await fetch(`https://api.binance.com/api/v3/klines?symbol=${s}&interval=1d&limit=300`)).json()).map(d=>parseFloat(d[4]));}
 async function refresh(){
   document.getElementById('triggered-list').innerHTML='<div class="loading">Loading...</div>';
   for(const s of COINS){try{coinData[s]={closes:await fetchCoin(s)};}catch(e){}}
-  const r=COINS.filter(s=>coinData[s]).map(s=>({symbol:s.replace('USDT',''),...checkSignal(coinData[s].closes,settings.fast,settings.slow,settings.confirm,settings.sma200)}));
-  const t=r.filter(x=>x.status==='triggered'), e=r.filter(x=>x.status==='emerging');
+  let r=COINS.filter(s=>coinData[s]).map(s=>({symbol:s.replace('USDT',''),...checkSignal(coinData[s].closes,settings.fast,settings.slow,settings.confirm,settings.sma200)}));
+  // Rank by ROC among those that are triggered or emerging
+  const ranked=r.filter(x=>x.status==='triggered'||x.status==='emerging').sort((a,b)=>b.roc-a.roc);
+  ranked.forEach((x,i)=>x.priority=i+1);
+  r.forEach(x=>{ if(!x.priority) x.priority=null; });
+  const t=r.filter(x=>x.status==='triggered').sort((a,b)=>(a.priority||999)-(b.priority||999));
+  const e=r.filter(x=>x.status==='emerging').sort((a,b)=>(a.priority||999)-(b.priority||999));
   document.getElementById('triggered-count').textContent=t.length;
   document.getElementById('emerging-count').textContent=e.length;
   document.getElementById('stats').innerHTML=`<div class="stat"><div class="stat-value">${t.length}</div><div class="stat-label">Triggered</div></div><div class="stat"><div class="stat-value">${e.length}</div><div class="stat-label">Emerging</div></div><div class="stat"><div class="stat-value">${r.length}</div><div class="stat-label">Coins</div></div><div class="stat"><div class="stat-value">${log.length}</div><div class="stat-label">Logged</div></div>`;
-  document.getElementById('triggered-list').innerHTML=t.length?t.map(x=>`<div class="coin-row"><div><span class="status-dot triggered"></span><span class="coin-name ${isTop(x.symbol)?'top-coin':''}">${x.symbol}</span>${isTop(x.symbol)?'<span class="badge top">TOP</span>':''}<div class="coin-detail">$${x.price?.toFixed(2)||'-'}</div></div><span class="badge green">BUY</span></div>`).join(''):'<div class="coin-detail">None</div>';
-  document.getElementById('emerging-list').innerHTML=e.length?e.map(x=>`<div class="coin-row"><div><span class="status-dot emerging"></span><span class="coin-name ${isTop(x.symbol)?'top-coin':''}">${x.symbol}</span>${isTop(x.symbol)?'<span class="badge top">TOP</span>':''}<div class="coin-detail">$${x.price?.toFixed(2)||'-'} · ${x.days}/${settings.confirm}</div></div><span class="badge yellow">WATCH</span></div>`).join(''):'<div class="coin-detail">None</div>';
-  document.getElementById('cond-body').innerHTML=r.map(x=>`<tr><td class="${isTop(x.symbol)?'top-coin':''}">${x.symbol}${isTop(x.symbol)?' <span class="badge top">TOP</span>':''}</td><td>$${x.price?.toFixed(2)||'-'}</td><td class="${x.maOk?'check':'cross'}">${x.maOk?'\u2713':'\u2717'}</td><td class="${x.days>=settings.confirm?'check':x.days>0?'partial':'cross'}">${x.days}/${settings.confirm}</td><td class="${x.above200?'check':'cross'}">${settings.sma200?(x.above200?'\u2713':'\u2717'):'-'}</td><td class="${x.slope100?'check':'cross'}">${x.slope100?'\u2713':'\u2717'}</td><td class="${x.btc?'check':'cross'}">${x.btc?'\u2713':'\u2717'}</td><td><span class="badge ${x.status==='triggered'?'green':x.status==='emerging'?'yellow':''}">${x.status}</span></td></tr>`).join('');
+  document.getElementById('triggered-list').innerHTML=t.length?t.map(x=>`<div class="coin-row"><div><span class="status-dot triggered"></span><span class="coin-name ${isTop(x.symbol)?'top-coin':''}">${x.symbol}</span>${isTop(x.symbol)?'<span class="badge top">TOP</span>':''}${x.priority?'<span class="badge priority">#'+x.priority+'</span>':''}<div class="coin-detail">$${x.price?.toFixed(2)||'-'} · ${(x.roc*100).toFixed(1)}% ROC</div></div><span class="badge green">BUY</span></div>`).join(''):'<div class="coin-detail">None</div>';
+  document.getElementById('emerging-list').innerHTML=e.length?e.map(x=>`<div class="coin-row"><div><span class="status-dot emerging"></span><span class="coin-name ${isTop(x.symbol)?'top-coin':''}">${x.symbol}</span>${isTop(x.symbol)?'<span class="badge top">TOP</span>':''}${x.priority?'<span class="badge priority">#'+x.priority+'</span>':''}<div class="coin-detail">$${x.price?.toFixed(2)||'-'} · ${x.days}/${settings.confirm} · ${(x.roc*100).toFixed(1)}% ROC</div></div><span class="badge yellow">WATCH</span></div>`).join(''):'<div class="coin-detail">None</div>';
+  document.getElementById('cond-body').innerHTML=r.map(x=>`<tr><td class="${isTop(x.symbol)?'top-coin':''}">${x.symbol}${isTop(x.symbol)?' <span class="badge top">TOP</span>':''}</td><td>$${x.price?.toFixed(2)||'-'}</td><td class="${x.maOk?'check':'cross'}">${x.maOk?'\u2713':'\u2717'}</td><td class="${x.days>=settings.confirm?'check':x.days>0?'partial':'cross'}">${x.days}/${settings.confirm}</td><td class="${x.above200?'check':'cross'}">${settings.sma200?(x.above200?'\u2713':'\u2717'):'-'}</td><td class="${x.slope100?'check':'cross'}">${x.slope100?'\u2713':'\u2717'}</td><td class="${x.btc?'check':'cross'}">${x.btc?'\u2713':'\u2717'}</td><td>${(x.roc*100).toFixed(1)}%</td><td>${x.priority?'#'+x.priority:'-'}</td><td><span class="badge ${x.status==='triggered'?'green':x.status==='emerging'?'yellow':''}">${x.status}</span></td></tr>`).join('');
   document.getElementById('log-coin').innerHTML=COINS.map(c=>`<option value="${c.replace('USDT','')}">${c.replace('USDT','')}</option>`).join('');
 }
 function addLog(){
