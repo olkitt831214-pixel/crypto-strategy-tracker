@@ -5,58 +5,92 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Crypto Strategy Tracker</title>
 <style>
-:root { --bg:#0f1419; --card:#1a2332; --border:#2d3a4d; --text:#e7ecf3; --muted:#8b9bb4; --green:#22c55e; --red:#ef4444; --yellow:#eab308; --blue:#3b82f6; --accent:#6366f1; }
+:root { --bg:#0f1419; --card:#1a2332; --border:#2d3a4d; --text:#e7ecf3; --muted:#8b9bb4; --green:#22c55e; --red:#ef4444; --yellow:#eab308; --accent:#6366f1; }
 * { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:20px; }
-.header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
-h1 { font-size:1.5rem; font-weight:600; }
-.subtitle { color:var(--muted); font-size:0.85rem; }
-button { background:var(--accent); color:#fff; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:0.9rem; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:16px; }
+.header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px; }
+h1 { font-size:1.4rem; font-weight:600; }
+.subtitle { color:var(--muted); font-size:0.8rem; }
+button { background:var(--accent); color:#fff; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:0.85rem; }
 button.secondary { background:var(--card); border:1px solid var(--border); }
-.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; margin-bottom:24px; }
-.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px; }
-.card h2 { font-size:1rem; margin-bottom:12px; }
-.badge { font-size:0.7rem; padding:2px 8px; border-radius:10px; font-weight:600; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; margin-bottom:20px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; }
+.card h2 { font-size:0.95rem; margin-bottom:10px; }
+.badge { font-size:0.65rem; padding:2px 6px; border-radius:8px; font-weight:600; }
 .badge.green { background:rgba(34,197,94,0.2); color:var(--green); }
 .badge.yellow { background:rgba(234,179,8,0.2); color:var(--yellow); }
 .badge.red { background:rgba(239,68,68,0.2); color:var(--red); }
-.coin-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); }
+.coin-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); }
 .coin-name { font-weight:600; }
-.coin-detail { font-size:0.8rem; color:var(--muted); }
-.status-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
+.coin-detail { font-size:0.75rem; color:var(--muted); }
+.status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:5px; }
 .status-dot.triggered { background:var(--green); }
 .status-dot.emerging { background:var(--yellow); }
 .status-dot.none { background:var(--muted); }
-.log-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
-.log-table th, .log-table td { text-align:left; padding:8px; border-bottom:1px solid var(--border); }
-.form-row { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
-input, select { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:6px; }
-.tabs { display:flex; gap:4px; margin-bottom:16px; }
-.tab { padding:8px 16px; background:transparent; border:none; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; }
+.log-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+.log-table th, .log-table td { text-align:left; padding:6px; border-bottom:1px solid var(--border); }
+.form-row { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+input, select { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px; font-size:0.85rem; }
+.tabs { display:flex; gap:2px; margin-bottom:14px; }
+.tab { padding:6px 12px; background:transparent; border:none; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; font-size:0.85rem; }
 .tab.active { color:var(--text); border-bottom-color:var(--accent); }
 .panel { display:none; }
 .panel.active { display:block; }
-.loading { color:var(--muted); text-align:center; padding:20px; }
-.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin-bottom:16px; }
-.stat { background:var(--bg); padding:12px; border-radius:8px; text-align:center; }
-.stat-value { font-size:1.4rem; font-weight:600; }
-.stat-label { font-size:0.75rem; color:var(--muted); }
+.loading { color:var(--muted); text-align:center; padding:16px; }
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:10px; margin-bottom:14px; }
+.stat { background:var(--bg); padding:10px; border-radius:8px; text-align:center; }
+.stat-value { font-size:1.3rem; font-weight:600; }
+.stat-label { font-size:0.7rem; color:var(--muted); }
+.cond-table { width:100%; font-size:0.75rem; border-collapse:collapse; }
+.cond-table th { text-align:center; padding:4px; color:var(--muted); font-weight:500; }
+.cond-table td { text-align:center; padding:6px 4px; border-bottom:1px solid var(--border); }
+.cond-table td:first-child { text-align:left; font-weight:600; }
+.check { color:var(--green); font-weight:bold; }
+.cross { color:var(--red); }
+.partial { color:var(--yellow); }
 </style>
 </head>
 <body>
-<div class="header"><div><h1>Crypto Strategy Tracker</h1><div class="subtitle">11/35 SMA + 3-day confirm + 200 SMA + BTC > 50 SMA</div></div><div><button onclick="refresh()">Refresh</button> <button class="secondary" onclick="exportLog()">Export Log</button></div></div>
+<div class="header"><div><h1>Crypto Strategy Tracker</h1><div class="subtitle">11/35 SMA + 3-day confirm + 200 SMA + BTC > 50 SMA</div></div><div><button onclick="refresh()">Refresh</button> <button class="secondary" onclick="exportLog()">Export</button></div></div>
 <div class="tabs"><button class="tab active" onclick="showTab('signals')">Signals</button><button class="tab" onclick="showTab('log')">Trade Log</button><button class="tab" onclick="showTab('settings')">Settings</button></div>
-<div id="signals" class="panel active"><div class="stats" id="stats"></div><div class="grid"><div class="card"><h2>Triggered <span class="badge green" id="triggered-count">0</span></h2><div id="triggered-list"><div class="loading">Loading...</div></div></div><div class="card"><h2>Emerging <span class="badge yellow" id="emerging-count">0</span></h2><div id="emerging-list"><div class="loading">Loading...</div></div></div></div><div class="card"><h2>All Coins</h2><div id="all-coins"><div class="loading">Loading...</div></div></div></div>
+<div id="signals" class="panel active"><div class="stats" id="stats"></div><div class="grid"><div class="card"><h2>Triggered <span class="badge green" id="triggered-count">0</span></h2><div id="triggered-list"><div class="loading">Loading...</div></div></div><div class="card"><h2>Emerging <span class="badge yellow" id="emerging-count">0</span></h2><div id="emerging-list"><div class="loading">Loading...</div></div></div></div><div class="card"><h2>Condition Status</h2><div style="overflow-x:auto"><table class="cond-table" id="cond-table"><thead><tr><th>Coin</th><th>Price</th><th>11>35</th><th>Days</th><th>>200</th><th>BTC</th><th>Status</th></tr></thead><tbody id="cond-body"></tbody></table></div></div></div>
 <div id="log" class="panel"><div class="card"><h2>Log a Trade</h2><div class="form-row"><select id="log-coin"></select><select id="log-action"><option value="entry">Entry</option><option value="exit">Exit</option></select><input type="number" id="log-price" placeholder="Price" step="0.01"><input type="text" id="log-note" placeholder="Note"><button onclick="addLog()">Add</button></div><table class="log-table"><thead><tr><th>Date</th><th>Coin</th><th>Action</th><th>Price</th><th>Note</th><th></th></tr></thead><tbody id="log-body"></tbody></table></div></div>
-<div id="settings" class="panel"><div class="card"><h2>Settings</h2><div class="form-row"><label>Fast: <input type="number" id="set-fast" value="11" style="width:60px"></label><label>Slow: <input type="number" id="set-slow" value="35" style="width:60px"></label><label>Confirm: <input type="number" id="set-confirm" value="3" style="width:50px"></label><label>200 SMA: <input type="checkbox" id="set-sma200" checked></label></div><button onclick="saveSettings()">Save</button></div></div>
+<div id="settings" class="panel"><div class="card"><h2>Settings</h2><div class="form-row"><label>Fast: <input type="number" id="set-fast" value="11" style="width:50px"></label><label>Slow: <input type="number" id="set-slow" value="35" style="width:50px"></label><label>Confirm: <input type="number" id="set-confirm" value="3" style="width:40px"></label><label>200 SMA: <input type="checkbox" id="set-sma200" checked></label></div><button onclick="saveSettings()">Save</button></div></div>
 <script>
 const COINS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','DOGEUSDT','ADAUSDT','XRPUSDT','LINKUSDT','AVAXUSDT','DOTUSDT','LTCUSDT','NEARUSDT','HBARUSDT','INJUSDT','ATOMUSDT'];
 let settings={fast:11,slow:35,confirm:3,sma200:true}, log=JSON.parse(localStorage.getItem('tradeLog')||'[]'), coinData={};
 function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');event.target.classList.add('active');if(id==='log')renderLog();}
 function sma(a,n){if(a.length<n)return null;return a.slice(-n).reduce((x,y)=>x+y,0)/n;}
-function checkSignal(c,f,s,conf,u200){if(c.length<Math.max(s,200)+conf)return{status:'none',days:0};let d=0;for(let i=0;i<conf;i++){const idx=c.length-1-i,ff=sma(c.slice(0,idx+1),f),ss=sma(c.slice(0,idx+1),s),p=c[idx],s2=sma(c,200);if(ff&&ss&&ff>ss&&(!u200||(s2&&p>s2)))d++;else break;}const btc=coinData['BTCUSDT']?coinData['BTCUSDT'].closes.at(-1)>sma(coinData['BTCUSDT'].closes,50):true,price=c.at(-1);if(d>=conf&&btc)return{status:'triggered',days:d,price};if(d>=conf-1&&d>0)return{status:'emerging',days:d,price};return{status:'none',days:d,price};}
+function checkSignal(c,f,s,conf,u200){
+  if(c.length<Math.max(s,200)+conf)return{status:'none',days:0,maOk:false,above200:false};
+  const price=c.at(-1), sFast=sma(c,f), sSlow=sma(c,s), s200=sma(c,200);
+  const maOk=sFast&&sSlow&&sFast>sSlow;
+  const above200=!u200||(s200&&price>s200);
+  let d=0;
+  for(let i=0;i<conf;i++){
+    const idx=c.length-1-i, ff=sma(c.slice(0,idx+1),f), ss=sma(c.slice(0,idx+1),s), p=c[idx], s2=sma(c,200);
+    if(ff&&ss&&ff>ss&&(!u200||(s2&&p>s2)))d++; else break;
+  }
+  const btc=coinData['BTCUSDT']?coinData['BTCUSDT'].closes.at(-1)>sma(coinData['BTCUSDT'].closes,50):true;
+  let status='none';
+  if(d>=conf&&btc)status='triggered';
+  else if(d>=conf-1&&d>0)status='emerging';
+  return{status,days:d,price,maOk,above200,btc};
+}
 async function fetchCoin(s){return(await(await fetch(`https://api.binance.com/api/v3/klines?symbol=${s}&interval=1d&limit=250`)).json()).map(d=>parseFloat(d[4]));}
-async function refresh(){document.getElementById('triggered-list').innerHTML='<div class="loading">Loading...</div>';for(const s of COINS){try{coinData[s]={closes:await fetchCoin(s)};}catch(e){}}const r=COINS.filter(s=>coinData[s]).map(s=>({symbol:s.replace('USDT',''),...checkSignal(coinData[s].closes,settings.fast,settings.slow,settings.confirm,settings.sma200)}));const t=r.filter(x=>x.status==='triggered'),e=r.filter(x=>x.status==='emerging');document.getElementById('triggered-count').textContent=t.length;document.getElementById('emerging-count').textContent=e.length;document.getElementById('stats').innerHTML=`<div class="stat"><div class="stat-value">${t.length}</div><div class="stat-label">Triggered</div></div><div class="stat"><div class="stat-value">${e.length}</div><div class="stat-label">Emerging</div></div><div class="stat"><div class="stat-value">${r.length}</div><div class="stat-label">Coins</div></div><div class="stat"><div class="stat-value">${log.length}</div><div class="stat-label">Logged</div></div>`;document.getElementById('triggered-list').innerHTML=t.length?t.map(x=>`<div class="coin-row"><div><span class="status-dot triggered"></span><span class="coin-name">${x.symbol}</span><div class="coin-detail">$${x.price?.toFixed(2)||'-'}</div></div><span class="badge green">BUY</span></div>`).join(''):'<div class="coin-detail">None</div>';document.getElementById('emerging-list').innerHTML=e.length?e.map(x=>`<div class="coin-row"><div><span class="status-dot emerging"></span><span class="coin-name">${x.symbol}</span><div class="coin-detail">$${x.price?.toFixed(2)||'-'} · ${x.days}/${settings.confirm}</div></div><span class="badge yellow">WATCH</span></div>`).join(''):'<div class="coin-detail">None</div>';document.getElementById('all-coins').innerHTML=r.map(x=>`<div class="coin-row"><div><span class="status-dot ${x.status}"></span><span class="coin-name">${x.symbol}</span></div><span class="badge ${x.status==='triggered'?'green':x.status==='emerging'?'yellow':''}">${x.status}</span></div>`).join('');document.getElementById('log-coin').innerHTML=COINS.map(c=>`<option value="${c.replace('USDT','')}">${c.replace('USDT','')}</option>`).join('');}
+async function refresh(){
+  document.getElementById('triggered-list').innerHTML='<div class="loading">Loading...</div>';
+  for(const s of COINS){try{coinData[s]={closes:await fetchCoin(s)};}catch(e){}}
+  const r=COINS.filter(s=>coinData[s]).map(s=>({symbol:s.replace('USDT',''),...checkSignal(coinData[s].closes,settings.fast,settings.slow,settings.confirm,settings.sma200)}));
+  const t=r.filter(x=>x.status==='triggered'), e=r.filter(x=>x.status==='emerging');
+  document.getElementById('triggered-count').textContent=t.length;
+  document.getElementById('emerging-count').textContent=e.length;
+  document.getElementById('stats').innerHTML=`<div class="stat"><div class="stat-value">${t.length}</div><div class="stat-label">Triggered</div></div><div class="stat"><div class="stat-value">${e.length}</div><div class="stat-label">Emerging</div></div><div class="stat"><div class="stat-value">${r.length}</div><div class="stat-label">Coins</div></div><div class="stat"><div class="stat-value">${log.length}</div><div class="stat-label">Logged</div></div>`;
+  document.getElementById('triggered-list').innerHTML=t.length?t.map(x=>`<div class="coin-row"><div><span class="status-dot triggered"></span><span class="coin-name">${x.symbol}</span><div class="coin-detail">$${x.price?.toFixed(2)||'-'}</div></div><span class="badge green">BUY</span></div>`).join(''):'<div class="coin-detail">None</div>';
+  document.getElementById('emerging-list').innerHTML=e.length?e.map(x=>`<div class="coin-row"><div><span class="status-dot emerging"></span><span class="coin-name">${x.symbol}</span><div class="coin-detail">$${x.price?.toFixed(2)||'-'} · ${x.days}/${settings.confirm}</div></div><span class="badge yellow">WATCH</span></div>`).join(''):'<div class="coin-detail">None</div>';
+  document.getElementById('cond-body').innerHTML=r.map(x=>`<tr><td>${x.symbol}</td><td>$${x.price?.toFixed(2)||'-'}</td><td class="${x.maOk?'check':'cross'}">${x.maOk?'\u2713':'\u2717'}</td><td class="${x.days>=settings.confirm?'check':x.days>0?'partial':'cross'}">${x.days}/${settings.confirm}</td><td class="${x.above200?'check':'cross'}">${settings.sma200?(x.above200?'\u2713':'\u2717'):'-'}</td><td class="${x.btc?'check':'cross'}">${x.btc?'\u2713':'\u2717'}</td><td><span class="badge ${x.status==='triggered'?'green':x.status==='emerging'?'yellow':''}">${x.status}</span></td></tr>`).join('');
+  document.getElementById('log-coin').innerHTML=COINS.map(c=>`<option value="${c.replace('USDT','')}">${c.replace('USDT','')}</option>`).join('');
+}
 function addLog(){log.unshift({date:new Date().toISOString().slice(0,10),coin:document.getElementById('log-coin').value,action:document.getElementById('log-action').value,price:parseFloat(document.getElementById('log-price').value)||0,note:document.getElementById('log-note').value});localStorage.setItem('tradeLog',JSON.stringify(log));document.getElementById('log-price').value='';document.getElementById('log-note').value='';renderLog();}
 function renderLog(){document.getElementById('log-body').innerHTML=log.map((e,i)=>`<tr><td>${e.date}</td><td>${e.coin}</td><td><span class="badge ${e.action==='entry'?'green':''}">${e.action}</span></td><td>$${e.price}</td><td>${e.note||''}</td><td><button class="secondary" onclick="deleteLog(${i})" style="padding:4px 8px">\u00d7</button></td></tr>`).join('');}
 function deleteLog(i){log.splice(i,1);localStorage.setItem('tradeLog',JSON.stringify(log));renderLog();}
