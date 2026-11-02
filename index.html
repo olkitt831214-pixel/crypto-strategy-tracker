@@ -20,6 +20,7 @@ button.secondary { background:var(--card); border:1px solid var(--border); }
 .badge.green { background:rgba(34,197,94,0.2); color:var(--green); }
 .badge.yellow { background:rgba(234,179,8,0.2); color:var(--yellow); }
 .badge.red { background:rgba(239,68,68,0.2); color:var(--red); }
+.badge.top { background:rgba(99,102,241,0.25); color:#a5b4fc; margin-left:6px; }
 .coin-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); }
 .coin-name { font-weight:600; }
 .coin-detail { font-size:0.75rem; color:var(--muted); }
@@ -48,6 +49,7 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 .check { color:var(--green); font-weight:bold; }
 .cross { color:var(--red); }
 .partial { color:var(--yellow); }
+.top-coin { font-weight:700; }
 </style>
 </head>
 <body>
@@ -57,8 +59,10 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 <div id="log" class="panel"><div class="card"><h2>Log a Trade</h2><div class="form-row"><select id="log-coin"></select><select id="log-action"><option value="entry">Entry</option><option value="exit">Exit</option></select><input type="number" id="log-price" placeholder="Price" step="0.01"><input type="text" id="log-note" placeholder="Note"><button onclick="addLog()">Add</button></div><table class="log-table"><thead><tr><th>Date</th><th>Coin</th><th>Action</th><th>Price</th><th>Note</th><th></th></tr></thead><tbody id="log-body"></tbody></table></div></div>
 <div id="settings" class="panel"><div class="card"><h2>Settings</h2><div class="form-row"><label>Fast: <input type="number" id="set-fast" value="15" style="width:50px"></label><label>Slow: <input type="number" id="set-slow" value="40" style="width:50px"></label><label>Confirm: <input type="number" id="set-confirm" value="3" style="width:40px"></label><label>200 SMA: <input type="checkbox" id="set-sma200" checked></label></div><button onclick="saveSettings()">Save</button></div></div>
 <script>
+const TOP13=['BTC','ETH','BNB','SOL','XRP','ADA','DOGE','AVAX','DOT','LINK','ATOM','LTC','BCH'];
 const COINS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','LINKUSDT','ATOMUSDT','LTCUSDT','BCHUSDT','AAVEUSDT','ALGOUSDT','NEARUSDT','ICPUSDT','FILUSDT','ETCUSDT','XLMUSDT','VETUSDT','THETAUSDT','EOSUSDT','TRXUSDT','XTZUSDT','NEOUSDT','IOTAUSDT','ZECUSDT','DASHUSDT','WAVESUSDT','ZILUSDT','BATUSDT','MANAUSDT','SANDUSDT','AXSUSDT','ENJUSDT','CHZUSDT','HBARUSDT','QNTUSDT','EGLDUSDT','FLOWUSDT','KSMUSDT'];
 let settings={fast:15,slow:40,confirm:3,sma200:true}, log=JSON.parse(localStorage.getItem('tradeLog')||'[]'), coinData={};
+function isTop(symbol){return TOP13.includes(symbol);}
 function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');event.target.classList.add('active');if(id==='log')renderLog();}
 function sma(a,n){if(a.length<n)return null;return a.slice(-n).reduce((x,y)=>x+y,0)/n;}
 function isRising(closes, period, lookback){
@@ -94,9 +98,9 @@ async function refresh(){
   document.getElementById('triggered-count').textContent=t.length;
   document.getElementById('emerging-count').textContent=e.length;
   document.getElementById('stats').innerHTML=`<div class="stat"><div class="stat-value">${t.length}</div><div class="stat-label">Triggered</div></div><div class="stat"><div class="stat-value">${e.length}</div><div class="stat-label">Emerging</div></div><div class="stat"><div class="stat-value">${r.length}</div><div class="stat-label">Coins</div></div><div class="stat"><div class="stat-value">${log.length}</div><div class="stat-label">Logged</div></div>`;
-  document.getElementById('triggered-list').innerHTML=t.length?t.map(x=>`<div class="coin-row"><div><span class="status-dot triggered"></span><span class="coin-name">${x.symbol}</span><div class="coin-detail">$${x.price?.toFixed(2)||'-'}</div></div><span class="badge green">BUY</span></div>`).join(''):'<div class="coin-detail">None</div>';
-  document.getElementById('emerging-list').innerHTML=e.length?e.map(x=>`<div class="coin-row"><div><span class="status-dot emerging"></span><span class="coin-name">${x.symbol}</span><div class="coin-detail">$${x.price?.toFixed(2)||'-'} · ${x.days}/${settings.confirm}</div></div><span class="badge yellow">WATCH</span></div>`).join(''):'<div class="coin-detail">None</div>';
-  document.getElementById('cond-body').innerHTML=r.map(x=>`<tr><td>${x.symbol}</td><td>$${x.price?.toFixed(2)||'-'}</td><td class="${x.maOk?'check':'cross'}">${x.maOk?'\u2713':'\u2717'}</td><td class="${x.days>=settings.confirm?'check':x.days>0?'partial':'cross'}">${x.days}/${settings.confirm}</td><td class="${x.above200?'check':'cross'}">${settings.sma200?(x.above200?'\u2713':'\u2717'):'-'}</td><td class="${x.slope100?'check':'cross'}">${x.slope100?'\u2713':'\u2717'}</td><td class="${x.btc?'check':'cross'}">${x.btc?'\u2713':'\u2717'}</td><td><span class="badge ${x.status==='triggered'?'green':x.status==='emerging'?'yellow':''}">${x.status}</span></td></tr>`).join('');
+  document.getElementById('triggered-list').innerHTML=t.length?t.map(x=>`<div class="coin-row"><div><span class="status-dot triggered"></span><span class="coin-name ${isTop(x.symbol)?'top-coin':''}">${x.symbol}</span>${isTop(x.symbol)?'<span class="badge top">TOP</span>':''}<div class="coin-detail">$${x.price?.toFixed(2)||'-'}</div></div><span class="badge green">BUY</span></div>`).join(''):'<div class="coin-detail">None</div>';
+  document.getElementById('emerging-list').innerHTML=e.length?e.map(x=>`<div class="coin-row"><div><span class="status-dot emerging"></span><span class="coin-name ${isTop(x.symbol)?'top-coin':''}">${x.symbol}</span>${isTop(x.symbol)?'<span class="badge top">TOP</span>':''}<div class="coin-detail">$${x.price?.toFixed(2)||'-'} · ${x.days}/${settings.confirm}</div></div><span class="badge yellow">WATCH</span></div>`).join(''):'<div class="coin-detail">None</div>';
+  document.getElementById('cond-body').innerHTML=r.map(x=>`<tr><td class="${isTop(x.symbol)?'top-coin':''}">${x.symbol}${isTop(x.symbol)?' <span class="badge top">TOP</span>':''}</td><td>$${x.price?.toFixed(2)||'-'}</td><td class="${x.maOk?'check':'cross'}">${x.maOk?'\u2713':'\u2717'}</td><td class="${x.days>=settings.confirm?'check':x.days>0?'partial':'cross'}">${x.days}/${settings.confirm}</td><td class="${x.above200?'check':'cross'}">${settings.sma200?(x.above200?'\u2713':'\u2717'):'-'}</td><td class="${x.slope100?'check':'cross'}">${x.slope100?'\u2713':'\u2717'}</td><td class="${x.btc?'check':'cross'}">${x.btc?'\u2713':'\u2717'}</td><td><span class="badge ${x.status==='triggered'?'green':x.status==='emerging'?'yellow':''}">${x.status}</span></td></tr>`).join('');
   document.getElementById('log-coin').innerHTML=COINS.map(c=>`<option value="${c.replace('USDT','')}">${c.replace('USDT','')}</option>`).join('');
 }
 function addLog(){log.unshift({date:new Date().toISOString().slice(0,10),coin:document.getElementById('log-coin').value,action:document.getElementById('log-action').value,price:parseFloat(document.getElementById('log-price').value)||0,note:document.getElementById('log-note').value});localStorage.setItem('tradeLog',JSON.stringify(log));document.getElementById('log-price').value='';document.getElementById('log-note').value='';renderLog();}
