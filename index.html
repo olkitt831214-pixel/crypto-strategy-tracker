@@ -53,12 +53,14 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 .top-coin { font-weight:700; }
 .pl-pos { color:var(--green); }
 .pl-neg { color:var(--red); }
+.vol-good { color:var(--green); }
+.vol-low { color:var(--yellow); }
 </style>
 </head>
 <body>
 <div class="header"><div><h1>Crypto Strategy Tracker</h1><div class="subtitle">15/40 SMA + 3-day confirm + 200 SMA + 100 SMA rising (15d) + BTC filter</div></div><div><button onclick="refresh()">Refresh</button> <button class="secondary" onclick="exportLog()">Export</button></div></div>
 <div class="tabs"><button class="tab active" onclick="showTab('signals')">Signals</button><button class="tab" onclick="showTab('log')">Trade Log</button><button class="tab" onclick="showTab('settings')">Settings</button></div>
-<div id="signals" class="panel active"><div class="stats" id="stats"></div><div class="grid"><div class="card"><h2>Triggered (ranked by 30d ROC) <span class="badge green" id="triggered-count">0</span></h2><div id="triggered-list"><div class="loading">Loading...</div></div></div><div class="card"><h2>Emerging (ranked by 30d ROC) <span class="badge yellow" id="emerging-count">0</span></h2><div id="emerging-list"><div class="loading">Loading...</div></div></div></div><div class="card"><h2>Condition Status</h2><div style="overflow-x:auto"><table class="cond-table" id="cond-table"><thead><tr><th>Coin</th><th>Price</th><th>15>40</th><th>Days</th><th>>200</th><th>100↑</th><th>BTC</th><th>30d ROC</th><th>Priority</th><th>Status</th></tr></thead><tbody id="cond-body"></tbody></table></div></div></div>
+<div id="signals" class="panel active"><div class="stats" id="stats"></div><div class="grid"><div class="card"><h2>Triggered (ranked by 30d ROC) <span class="badge green" id="triggered-count">0</span></h2><div id="triggered-list"><div class="loading">Loading...</div></div></div><div class="card"><h2>Emerging (ranked by 30d ROC) <span class="badge yellow" id="emerging-count">0</span></h2><div id="emerging-list"><div class="loading">Loading...</div></div></div></div><div class="card"><h2>Condition Status</h2><div style="overflow-x:auto"><table class="cond-table" id="cond-table"><thead><tr><th>Coin</th><th>Price</th><th>15>40</th><th>Days</th><th>>200</th><th>100↑</th><th>BTC</th><th>30d ROC</th><th>24h Vol</th><th>30d Avg Vol</th><th>Priority</th><th>Status</th></tr></thead><tbody id="cond-body"></tbody></table></div></div></div>
 <div id="log" class="panel"><div class="card"><h2>Log a Trade</h2>
 <div class="form-row">
   <select id="log-coin"></select>
@@ -74,6 +76,7 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 <script>
 const TOP13=['BTC','ETH','BNB','SOL','XRP','ADA','DOGE','AVAX','DOT','LINK','ATOM','LTC','BCH'];
 const COINS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','LINKUSDT','ATOMUSDT','LTCUSDT','BCHUSDT','AAVEUSDT','ALGOUSDT','NEARUSDT','ICPUSDT','FILUSDT','ETCUSDT','XLMUSDT','VETUSDT','THETAUSDT','EOSUSDT','TRXUSDT','XTZUSDT','NEOUSDT','IOTAUSDT','ZECUSDT','DASHUSDT','WAVESUSDT','ZILUSDT','BATUSDT','MANAUSDT','SANDUSDT','AXSUSDT','ENJUSDT','CHZUSDT','HBARUSDT','QNTUSDT','EGLDUSDT','FLOWUSDT','KSMUSDT'];
+const VOL_THRESHOLD = 10000000; // $10M
 let settings={fast:15,slow:40,confirm:3,sma200:true}, log=JSON.parse(localStorage.getItem('tradeLog')||'[]'), coinData={};
 function isTop(symbol){return TOP13.includes(symbol);}
 function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');event.target.classList.add('active');if(id==='log')renderLog();}
@@ -83,6 +86,17 @@ function roc30(closes){
   const curr=closes.at(-1);
   const prev=closes[closes.length-31];
   return prev ? (curr/prev - 1) : 0;
+}
+function avgVol30(vols){
+  if(!vols || vols.length<30) return 0;
+  return vols.slice(-30).reduce((a,b)=>a+b,0)/30;
+}
+function formatVol(v){
+  if(!v || v===0) return '-';
+  if(v>=1e9) return (v/1e9).toFixed(1)+'B';
+  if(v>=1e6) return (v/1e6).toFixed(1)+'M';
+  if(v>=1e3) return (v/1e3).toFixed(0)+'K';
+  return v.toFixed(0);
 }
 function isRising(closes, period, lookback){
   if(closes.length < period + lookback) return false;
@@ -109,12 +123,23 @@ function checkSignal(c,f,s,conf,u200){
   else if(d>=conf-1 && d>0 && slope100)status='emerging';
   return{status,days:d,price,maOk,above200,slope100,btc,roc};
 }
-async function fetchCoin(s){return(await(await fetch(`https://api.binance.com/api/v3/klines?symbol=${s}&interval=1d&limit=300`)).json()).map(d=>parseFloat(d[4]));}
+async function fetchCoin(s){
+  const data=await(await fetch(`https://api.binance.com/api/v3/klines?symbol=${s}&interval=1d&limit=300`)).json();
+  return {
+    closes: data.map(d=>parseFloat(d[4])),
+    volumes: data.map(d=>parseFloat(d[7])) // quote asset volume (USDT)
+  };
+}
 async function refresh(){
   document.getElementById('triggered-list').innerHTML='<div class="loading">Loading...</div>';
-  for(const s of COINS){try{coinData[s]={closes:await fetchCoin(s)};}catch(e){}}
-  let r=COINS.filter(s=>coinData[s]).map(s=>({symbol:s.replace('USDT',''),...checkSignal(coinData[s].closes,settings.fast,settings.slow,settings.confirm,settings.sma200)}));
-  // Rank by ROC among those that are triggered or emerging
+  for(const s of COINS){try{coinData[s]=await fetchCoin(s);}catch(e){}}
+  let r=COINS.filter(s=>coinData[s]).map(s=>{
+    const d=coinData[s];
+    const sig=checkSignal(d.closes,settings.fast,settings.slow,settings.confirm,settings.sma200);
+    const vol24=d.volumes.at(-1)||0;
+    const vol30=avgVol30(d.volumes);
+    return {symbol:s.replace('USDT',''), ...sig, vol24, vol30};
+  });
   const ranked=r.filter(x=>x.status==='triggered'||x.status==='emerging').sort((a,b)=>b.roc-a.roc);
   ranked.forEach((x,i)=>x.priority=i+1);
   r.forEach(x=>{ if(!x.priority) x.priority=null; });
@@ -123,9 +148,12 @@ async function refresh(){
   document.getElementById('triggered-count').textContent=t.length;
   document.getElementById('emerging-count').textContent=e.length;
   document.getElementById('stats').innerHTML=`<div class="stat"><div class="stat-value">${t.length}</div><div class="stat-label">Triggered</div></div><div class="stat"><div class="stat-value">${e.length}</div><div class="stat-label">Emerging</div></div><div class="stat"><div class="stat-value">${r.length}</div><div class="stat-label">Coins</div></div><div class="stat"><div class="stat-value">${log.length}</div><div class="stat-label">Logged</div></div>`;
-  document.getElementById('triggered-list').innerHTML=t.length?t.map(x=>`<div class="coin-row"><div><span class="status-dot triggered"></span><span class="coin-name ${isTop(x.symbol)?'top-coin':''}">${x.symbol}</span>${isTop(x.symbol)?'<span class="badge top">TOP</span>':''}${x.priority?'<span class="badge priority">#'+x.priority+'</span>':''}<div class="coin-detail">$${x.price?.toFixed(2)||'-'} · ${(x.roc*100).toFixed(1)}% ROC</div></div><span class="badge green">BUY</span></div>`).join(''):'<div class="coin-detail">None</div>';
+  document.getElementById('triggered-list').innerHTML=t.length?t.map(x=>`<div class="coin-row"><div><span class="status-dot triggered"></span><span class="coin-name ${isTop(x.symbol)?'top-coin':''}">${x.symbol}</span>${isTop(x.symbol)?'<span class="badge top">TOP</span>':''}${x.priority?'<span class="badge priority">#'+x.priority+'</span>':''}<div class="coin-detail">$${x.price?.toFixed(2)||'-'} · ${(x.roc*100).toFixed(1)}% ROC · Vol ${formatVol(x.vol30)}</div></div><span class="badge green">BUY</span></div>`).join(''):'<div class="coin-detail">None</div>';
   document.getElementById('emerging-list').innerHTML=e.length?e.map(x=>`<div class="coin-row"><div><span class="status-dot emerging"></span><span class="coin-name ${isTop(x.symbol)?'top-coin':''}">${x.symbol}</span>${isTop(x.symbol)?'<span class="badge top">TOP</span>':''}${x.priority?'<span class="badge priority">#'+x.priority+'</span>':''}<div class="coin-detail">$${x.price?.toFixed(2)||'-'} · ${x.days}/${settings.confirm} · ${(x.roc*100).toFixed(1)}% ROC</div></div><span class="badge yellow">WATCH</span></div>`).join(''):'<div class="coin-detail">None</div>';
-  document.getElementById('cond-body').innerHTML=r.map(x=>`<tr><td class="${isTop(x.symbol)?'top-coin':''}">${x.symbol}${isTop(x.symbol)?' <span class="badge top">TOP</span>':''}</td><td>$${x.price?.toFixed(2)||'-'}</td><td class="${x.maOk?'check':'cross'}">${x.maOk?'\u2713':'\u2717'}</td><td class="${x.days>=settings.confirm?'check':x.days>0?'partial':'cross'}">${x.days}/${settings.confirm}</td><td class="${x.above200?'check':'cross'}">${settings.sma200?(x.above200?'\u2713':'\u2717'):'-'}</td><td class="${x.slope100?'check':'cross'}">${x.slope100?'\u2713':'\u2717'}</td><td class="${x.btc?'check':'cross'}">${x.btc?'\u2713':'\u2717'}</td><td>${(x.roc*100).toFixed(1)}%</td><td>${x.priority?'#'+x.priority:'-'}</td><td><span class="badge ${x.status==='triggered'?'green':x.status==='emerging'?'yellow':''}">${x.status}</span></td></tr>`).join('');
+  document.getElementById('cond-body').innerHTML=r.map(x=>{
+    const volClass = x.vol30 >= VOL_THRESHOLD ? 'vol-good' : 'vol-low';
+    return `<tr><td class="${isTop(x.symbol)?'top-coin':''}">${x.symbol}${isTop(x.symbol)?' <span class="badge top">TOP</span>':''}</td><td>$${x.price?.toFixed(2)||'-'}</td><td class="${x.maOk?'check':'cross'}">${x.maOk?'\u2713':'\u2717'}</td><td class="${x.days>=settings.confirm?'check':x.days>0?'partial':'cross'}">${x.days}/${settings.confirm}</td><td class="${x.above200?'check':'cross'}">${settings.sma200?(x.above200?'\u2713':'\u2717'):'-'}</td><td class="${x.slope100?'check':'cross'}">${x.slope100?'\u2713':'\u2717'}</td><td class="${x.btc?'check':'cross'}">${x.btc?'\u2713':'\u2717'}</td><td>${(x.roc*100).toFixed(1)}%</td><td class="${volClass}">${formatVol(x.vol24)}</td><td class="${volClass}">${formatVol(x.vol30)}</td><td>${x.priority?'#'+x.priority:'-'}</td><td><span class="badge ${x.status==='triggered'?'green':x.status==='emerging'?'yellow':''}">${x.status}</span></td></tr>`;
+  }).join('');
   document.getElementById('log-coin').innerHTML=COINS.map(c=>`<option value="${c.replace('USDT','')}">${c.replace('USDT','')}</option>`).join('');
 }
 function addLog(){
