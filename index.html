@@ -33,7 +33,7 @@ button.secondary { background:var(--card); border:1px solid var(--border); }
 .log-table th, .log-table td { text-align:left; padding:5px; border-bottom:1px solid var(--border); white-space:nowrap; }
 .form-row { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
 input, select { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px; font-size:0.85rem; }
-.tabs { display:flex; gap:2px; margin-bottom:14px; }
+.tabs { display:flex; gap:2px; margin-bottom:14px; flex-wrap:wrap; }
 .tab { padding:6px 12px; background:transparent; border:none; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; font-size:0.85rem; }
 .tab.active { color:var(--text); border-bottom-color:var(--accent); }
 .panel { display:none; }
@@ -55,11 +55,15 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 .pl-neg { color:var(--red); }
 .vol-good { color:var(--green); }
 .vol-low { color:var(--yellow); }
+.rules-list { font-size:0.9rem; line-height:1.6; }
+.rules-list h3 { font-size:1rem; margin:16px 0 8px; color:var(--accent); }
+.rules-list li { margin-bottom:8px; }
+.rules-list strong { color:var(--text); }
 </style>
 </head>
 <body>
 <div class="header"><div><h1>Crypto Strategy Tracker</h1><div class="subtitle">15/40 SMA + 3-day confirm + 200 SMA + 100 SMA rising (15d) + BTC filter</div></div><div><button onclick="refresh()">Refresh</button> <button class="secondary" onclick="exportLog()">Export</button></div></div>
-<div class="tabs"><button class="tab active" onclick="showTab('signals')">Signals</button><button class="tab" onclick="showTab('log')">Trade Log</button><button class="tab" onclick="showTab('settings')">Settings</button></div>
+<div class="tabs"><button class="tab active" onclick="showTab('signals')">Signals</button><button class="tab" onclick="showTab('log')">Trade Log</button><button class="tab" onclick="showTab('rules')">Rules</button><button class="tab" onclick="showTab('settings')">Settings</button></div>
 <div id="signals" class="panel active"><div class="stats" id="stats"></div><div class="grid"><div class="card"><h2>Triggered (ranked by 30d ROC) <span class="badge green" id="triggered-count">0</span></h2><div id="triggered-list"><div class="loading">Loading...</div></div></div><div class="card"><h2>Emerging (ranked by 30d ROC) <span class="badge yellow" id="emerging-count">0</span></h2><div id="emerging-list"><div class="loading">Loading...</div></div></div></div><div class="card"><h2>Condition Status</h2><div style="overflow-x:auto"><table class="cond-table" id="cond-table"><thead><tr><th>Coin</th><th>Price</th><th>15>40</th><th>Days</th><th>>200</th><th>100↑</th><th>BTC</th><th>30d ROC</th><th>24h Vol</th><th>30d Avg Vol</th><th>Priority</th><th>Status</th></tr></thead><tbody id="cond-body"></tbody></table></div></div></div>
 <div id="log" class="panel"><div class="card"><h2>Log a Trade</h2>
 <div class="form-row">
@@ -72,11 +76,39 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
   <button onclick="addLog()">Add</button>
 </div>
 <div style="overflow-x:auto"><table class="log-table"><thead><tr><th>Date</th><th>Coin</th><th>Entry</th><th>Exit</th><th>2.5x ATR</th><th>Size</th><th>P/L</th><th>P/L %</th><th>Note</th><th></th></tr></thead><tbody id="log-body"></tbody></table></div></div></div>
+<div id="rules" class="panel"><div class="card"><h2>Strategy Rules</h2>
+<div class="rules-list">
+<h3>Entry Conditions (all must be true at the daily close)</h3>
+<ul>
+<li><strong>15-day SMA above 40-day SMA</strong> — The faster moving average is above the slower one, indicating short-term upward momentum.</li>
+<li><strong>3-day confirmation</strong> — The 15>40 condition (and price above 200 SMA) has been true for 3 consecutive daily closes. Buy on the 3rd day.</li>
+<li><strong>Price above 200-day SMA</strong> — The coin is in a longer-term uptrend.</li>
+<li><strong>100-day SMA rising (15-day lookback)</strong> — The 100-day SMA is higher today than it was 15 days ago. Confirms the longer-term trend is still rising.</li>
+<li><strong>Bitcoin filter</strong> — Bitcoin itself is above its 200-day SMA and its 15-day SMA is above its 40-day SMA. The broad market must be in an uptrend.</li>
+</ul>
+<h3>Exit Conditions (any one is enough)</h3>
+<ul>
+<li><strong>15-day SMA falls below 40-day SMA</strong> — Short-term momentum has reversed.</li>
+<li><strong>Price closes below 200-day SMA</strong> — The longer-term uptrend has ended.</li>
+<li><strong>30% hard stop</strong> — Price closes 30% or more below the entry price.</li>
+<li><strong>2.5× ATR trailing stop</strong> — A trailing stop set at 2.5 times the Average True Range below the current price. Rises as price rises; never falls.</li>
+</ul>
+<h3>Additional Guidance</h3>
+<ul>
+<li><strong>Priority ranking</strong> — When multiple coins signal, prefer the ones with the highest 30-day Rate of Change (ROC). Lower priority numbers are stronger.</li>
+<li><strong>Volume filter</strong> — Prefer coins with 30-day average daily volume above $10M (shown in green). Lower volume increases slippage risk.</li>
+<li><strong>TOP badge</strong> — Marks the original 13 large-cap coins used in early backtests.</li>
+<li><strong>Long only</strong> — Never short. Cash is the defence when conditions are not met.</li>
+<li><strong>No leverage</strong> — Equal-weight the qualifying coins (or the top 4–6 by ranking).</li>
+<li><strong>Check once per day</strong> — After the daily candle closes (00:00 UTC). Act only on closed candles.</li>
+</ul>
+</div>
+</div></div>
 <div id="settings" class="panel"><div class="card"><h2>Settings</h2><div class="form-row"><label>Fast: <input type="number" id="set-fast" value="15" style="width:50px"></label><label>Slow: <input type="number" id="set-slow" value="40" style="width:50px"></label><label>Confirm: <input type="number" id="set-confirm" value="3" style="width:40px"></label><label>200 SMA: <input type="checkbox" id="set-sma200" checked></label></div><button onclick="saveSettings()">Save</button></div></div>
 <script>
 const TOP13=['BTC','ETH','BNB','SOL','XRP','ADA','DOGE','AVAX','DOT','LINK','ATOM','LTC','BCH'];
 const COINS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','LINKUSDT','ATOMUSDT','LTCUSDT','BCHUSDT','AAVEUSDT','ALGOUSDT','NEARUSDT','ICPUSDT','FILUSDT','ETCUSDT','XLMUSDT','VETUSDT','THETAUSDT','EOSUSDT','TRXUSDT','XTZUSDT','NEOUSDT','IOTAUSDT','ZECUSDT','DASHUSDT','WAVESUSDT','ZILUSDT','BATUSDT','MANAUSDT','SANDUSDT','AXSUSDT','ENJUSDT','CHZUSDT','HBARUSDT','QNTUSDT','EGLDUSDT','FLOWUSDT','KSMUSDT'];
-const VOL_THRESHOLD = 10000000; // $10M
+const VOL_THRESHOLD = 10000000;
 let settings={fast:15,slow:40,confirm:3,sma200:true}, log=JSON.parse(localStorage.getItem('tradeLog')||'[]'), coinData={};
 function isTop(symbol){return TOP13.includes(symbol);}
 function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');event.target.classList.add('active');if(id==='log')renderLog();}
@@ -127,7 +159,7 @@ async function fetchCoin(s){
   const data=await(await fetch(`https://api.binance.com/api/v3/klines?symbol=${s}&interval=1d&limit=300`)).json();
   return {
     closes: data.map(d=>parseFloat(d[4])),
-    volumes: data.map(d=>parseFloat(d[7])) // quote asset volume (USDT)
+    volumes: data.map(d=>parseFloat(d[7]))
   };
 }
 async function refresh(){
