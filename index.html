@@ -74,6 +74,8 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 .compare-row td { font-size:0.7rem; }
 .source-binance { color:#f0b90b; font-weight:600; }
 .source-cg { color:#8dc647; font-weight:600; }
+.bad-data { text-decoration: line-through; text-decoration-color: var(--red); text-decoration-thickness: 2px; opacity: 0.6; }
+.bad-data td { color: var(--red) !important; }
 </style>
 </head>
 <body>
@@ -174,6 +176,7 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 <li><strong>Long only</strong> — Never short. Cash is the defence when conditions are not met.</li>
 <li><strong>No leverage</strong> — Equal-weight the qualifying coins (or the top 4–6 by ranking).</li>
 <li><strong>Check once per day</strong> — After the daily candle closes (00:00 UTC). Act only on closed candles.</li>
+<li><strong>Red strikethrough</strong> — Binance price differs from CoinGecko by more than 5×. Data is unreliable; do not trade.</li>
 </ul>
 </div>
 </div></div>
@@ -183,7 +186,8 @@ const TOP13=['BTC','ETH','BNB','SOL','XRP','ADA','DOGE','AVAX','DOT','LINK','ATO
 const COINS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','LINKUSDT','ATOMUSDT','LTCUSDT','BCHUSDT','AAVEUSDT','ALGOUSDT','NEARUSDT','ICPUSDT','FILUSDT','ETCUSDT','XLMUSDT','VETUSDT','THETAUSDT','EOSUSDT','TRXUSDT','XTZUSDT','NEOUSDT','IOTAUSDT','ZECUSDT','DASHUSDT','WAVESUSDT','ZILUSDT','BATUSDT','MANAUSDT','SANDUSDT','AXSUSDT','ENJUSDT','CHZUSDT','HBARUSDT','QNTUSDT','EGLDUSDT','FLOWUSDT','KSMUSDT'];
 const CG_IDS = {BTC:'bitcoin',ETH:'ethereum',BNB:'binancecoin',SOL:'solana',XRP:'ripple',ADA:'cardano',DOGE:'dogecoin',AVAX:'avalanche-2',DOT:'polkadot',LINK:'chainlink',ATOM:'cosmos',LTC:'litecoin',BCH:'bitcoin-cash',AAVE:'aave',ALGO:'algorand',NEAR:'near',ICP:'internet-computer',FIL:'filecoin',ETC:'ethereum-classic',XLM:'stellar',VET:'vechain',THETA:'theta-token',EOS:'eos',TRX:'tron',XTZ:'tezos',NEO:'neo',IOTA:'iota',ZEC:'zcash',DASH:'dash',WAVES:'waves',ZIL:'zilliqa',BAT:'basic-attention-token',MANA:'decentraland',SAND:'the-sandbox',AXS:'axie-infinity',ENJ:'enjincoin',CHZ:'chiliz',HBAR:'hedera-hashgraph',QNT:'quant-network',EGLD:'elrond-erd-2',FLOW:'flow',KSM:'kusama'};
 const VOL_THRESHOLD = 10000000;
-let settings={fast:15,slow:40,confirm:3,sma200:true}, log=JSON.parse(localStorage.getItem('tradeLog')||'[]'), coinData={}, altData={}, expanded={};
+const PRICE_RATIO_LIMIT = 5;
+let settings={fast:15,slow:40,confirm:3,sma200:true}, log=JSON.parse(localStorage.getItem('tradeLog')||'[]'), coinData={}, altData={}, expanded={}, cgPrices={};
 function isTop(symbol){return TOP13.includes(symbol);}
 function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');event.target.classList.add('active');if(id==='log')renderLog();}
 function sma(a,n){if(!a||a.length<n)return null;return a.slice(-n).reduce((x,y)=>x+y,0)/n;}
@@ -211,6 +215,11 @@ function calcATR(closes, period=14){
     sum += Math.abs(closes[i] - closes[i-1]);
   }
   return sum / period;
+}
+function isBadData(binancePrice, cgPrice){
+  if(!binancePrice || !cgPrice || cgPrice <= 0) return false;
+  const ratio = binancePrice / cgPrice;
+  return ratio > PRICE_RATIO_LIMIT || ratio < (1 / PRICE_RATIO_LIMIT);
 }
 async function getATR(){
   const coin = document.getElementById('log-coin').value;
@@ -308,6 +317,16 @@ async function fetchCoin(s){
     volumes: data.map(d=>parseFloat(d[7]))
   };
 }
+async function fetchCgPrices(){
+  const ids = Object.values(CG_IDS).join(',');
+  try {
+    const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
+    const data = await r.json();
+    for(const [sym, id] of Object.entries(CG_IDS)){
+      if(data[id] && data[id].usd) cgPrices[sym] = data[id].usd;
+    }
+  } catch(e) {}
+}
 async function fetchAlt(symbol){
   const id = CG_IDS[symbol];
   if(!id) return null;
@@ -334,9 +353,12 @@ function renderTable(){
   document.getElementById('cond-body').innerHTML = r.map(x => {
     const volClass = x.vol30 >= VOL_THRESHOLD ? 'vol-good' : 'vol-low';
     const isExp = expanded[x.symbol];
-    let html = `<tr>
+    const cgPrice = cgPrices[x.symbol];
+    const bad = isBadData(x.price, cgPrice);
+    const rowClass = bad ? 'bad-data' : '';
+    let html = `<tr class="${rowClass}">
       <td><button class="tiny" onclick="toggleCompare('${x.symbol}')">${isExp?'\u2212':'+'}</button></td>
-      <td class="${isTop(x.symbol)?'top-coin':''}">${x.symbol}${isTop(x.symbol)?' <span class="badge top">TOP</span>':''}</td>
+      <td class="${isTop(x.symbol)?'top-coin':''}">${x.symbol}${isTop(x.symbol)?' <span class="badge top">TOP</span>':''}${bad?' <span class="badge red">BAD DATA</span>':''}</td>
       <td>$${x.price?.toFixed(2)||'-'}</td>
       <td class="${x.maOk?'check':'cross'}">${x.maOk?'\u2713':'\u2717'}</td>
       <td class="${x.days>=settings.confirm?'check':x.days>0?'partial':'cross'}">${x.days}/${settings.confirm}</td>
@@ -355,6 +377,8 @@ function renderTable(){
       if(aCloses && aCloses.length > 40){
         const aSig = checkSignal(aCloses, settings.fast, settings.slow, settings.confirm, settings.sma200);
         html += `<tr class="compare-row"><td></td><td class="source-cg">CoinGecko</td><td>$${aSig.price?.toFixed(4)||'-'}</td><td class="${aSig.maOk?'check':'cross'}">${aSig.maOk?'\u2713':'\u2717'}</td><td>${aSig.days}/${settings.confirm}</td><td class="${aSig.above200?'check':'cross'}">${aSig.above200?'\u2713':'\u2717'}</td><td class="${aSig.slope100?'check':'cross'}">${aSig.slope100?'\u2713':'\u2717'}</td><td class="${aSig.btc?'check':'cross'}">${aSig.btc?'\u2713':'\u2717'}</td><td>${(aSig.roc*100).toFixed(1)}%</td><td colspan="4"></td></tr>`;
+      } else if(cgPrice){
+        html += `<tr class="compare-row"><td></td><td class="source-cg">CoinGecko</td><td>$${cgPrice.toFixed(4)}</td><td colspan="10">(spot only)</td></tr>`;
       } else {
         html += `<tr class="compare-row"><td></td><td class="source-cg">CoinGecko</td><td colspan="11">Failed to load</td></tr>`;
       }
@@ -364,20 +388,23 @@ function renderTable(){
 }
 async function refresh(){
   document.getElementById('triggered-list').innerHTML='<div class="loading">Loading...</div>';
+  await fetchCgPrices();
   for(const s of COINS){try{coinData[s]=await fetchCoin(s);}catch(e){}}
   let r=COINS.filter(s=>coinData[s]).map(s=>{
     const d=coinData[s];
     const sig=checkSignal(d.closes,settings.fast,settings.slow,settings.confirm,settings.sma200);
     const vol24=d.volumes.at(-1)||0;
     const vol30=avgVol30(d.volumes);
-    return {symbol:s.replace('USDT',''), ...sig, vol24, vol30};
+    const symbol = s.replace('USDT','');
+    const bad = isBadData(sig.price, cgPrices[symbol]);
+    return {symbol, ...sig, vol24, vol30, bad};
   });
   const ranked=r.filter(x=>x.status==='triggered'||x.status==='emerging').sort((a,b)=>b.roc-a.roc);
   ranked.forEach((x,i)=>x.priority=i+1);
   r.forEach(x=>{ if(!x.priority) x.priority=null; });
   window._lastResults = r;
-  const t=r.filter(x=>x.status==='triggered').sort((a,b)=>(a.priority||999)-(b.priority||999));
-  const e=r.filter(x=>x.status==='emerging').sort((a,b)=>(a.priority||999)-(b.priority||999));
+  const t=r.filter(x=>x.status==='triggered' && !x.bad).sort((a,b)=>(a.priority||999)-(b.priority||999));
+  const e=r.filter(x=>x.status==='emerging' && !x.bad).sort((a,b)=>(a.priority||999)-(b.priority||999));
   document.getElementById('triggered-count').textContent=t.length;
   document.getElementById('emerging-count').textContent=e.length;
   document.getElementById('stats').innerHTML=`<div class="stat"><div class="stat-value">${t.length}</div><div class="stat-label">Triggered</div></div><div class="stat"><div class="stat-value">${e.length}</div><div class="stat-label">Emerging</div></div><div class="stat"><div class="stat-value">${r.length}</div><div class="stat-label">Coins</div></div><div class="stat"><div class="stat-value">${log.length}</div><div class="stat-label">Logged</div></div>`;
