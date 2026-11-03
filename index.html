@@ -215,9 +215,9 @@ function calcATR(closes, period=14){
   }
   return sum / period;
 }
-function isBadData(binancePrice, cgPrice){
-  if(!binancePrice || !cgPrice || cgPrice <= 0) return false;
-  const ratio = binancePrice / cgPrice;
+function isBadData(price, referencePrice){
+  if(!price || !referencePrice || referencePrice <= 0) return false;
+  const ratio = price / referencePrice;
   return ratio > PRICE_RATIO_LIMIT || ratio < (1 / PRICE_RATIO_LIMIT);
 }
 async function getATR(){
@@ -354,7 +354,7 @@ function renderTable(){
     const isExp = expanded[x.symbol];
     const cgPrice = cgPrices[x.symbol];
     const binanceBad = isBadData(x.binancePrice, cgPrice);
-    const cgBad = isBadData(cgPrice, x.binancePrice);
+    const cgBad = false;
     const usePrice = binanceBad && !cgBad ? cgPrice : x.binancePrice;
     const useSig = binanceBad && !cgBad && x.cgSig ? x.cgSig : x;
     let html = `<tr>
