@@ -13,6 +13,7 @@ h1 { font-size:1.4rem; font-weight:600; }
 .subtitle { color:var(--muted); font-size:0.8rem; }
 button { background:var(--accent); color:#fff; border:none; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:0.85rem; }
 button.secondary { background:var(--card); border:1px solid var(--border); }
+button.small { padding:6px 10px; font-size:0.8rem; }
 .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; margin-bottom:20px; }
 .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; }
 .card h2 { font-size:0.95rem; margin-bottom:10px; }
@@ -73,6 +74,7 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
   <input type="number" id="log-entry" placeholder="Entry Price" step="0.01" style="width:110px">
   <input type="number" id="log-exit" placeholder="Exit Price" step="0.01" style="width:110px">
   <input type="number" id="log-atr" placeholder="ATR value" step="0.01" style="width:100px">
+  <button class="secondary small" onclick="getATR()">Get ATR</button>
   <input type="number" id="log-size" placeholder="Size ($)" step="0.01" style="width:90px">
   <input type="text" id="log-note" placeholder="Note" style="width:120px">
   <button onclick="addLog()">Add</button>
@@ -139,6 +141,36 @@ function formatVol(v){
   if(v>=1e6) return (v/1e6).toFixed(1)+'M';
   if(v>=1e3) return (v/1e3).toFixed(0)+'K';
   return v.toFixed(0);
+}
+function calcATR(closes, period=14){
+  if(!closes || closes.length < period + 1) return null;
+  let sum = 0;
+  for(let i = closes.length - period; i < closes.length; i++){
+    sum += Math.abs(closes[i] - closes[i-1]);
+  }
+  return sum / period;
+}
+async function getATR(){
+  const coin = document.getElementById('log-coin').value;
+  const symbol = coin + 'USDT';
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '...';
+  try{
+    if(!coinData[symbol]){
+      coinData[symbol] = await fetchCoin(symbol);
+    }
+    const atr = calcATR(coinData[symbol].closes);
+    if(atr !== null){
+      document.getElementById('log-atr').value = atr.toFixed(2);
+    } else {
+      alert('Not enough data to calculate ATR');
+    }
+  }catch(e){
+    alert('Failed to fetch ATR');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Get ATR';
 }
 function isRising(closes, period, lookback){
   if(closes.length < period + lookback) return false;
