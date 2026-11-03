@@ -355,8 +355,9 @@ function renderTable(){
     const cgPrice = cgPrices[x.symbol];
     const binanceBad = isBadData(x.binancePrice, cgPrice);
     const cgBad = false;
-    const usePrice = binanceBad && !cgBad ? cgPrice : x.binancePrice;
-    const useSig = binanceBad && !cgBad && x.cgSig ? x.cgSig : x;
+    // Always use CoinGecko price if Binance is bad and we have a CG price
+    const usePrice = (binanceBad && cgPrice) ? cgPrice : x.binancePrice;
+    const useSig = (binanceBad && x.cgSig) ? x.cgSig : x;
     let html = `<tr>
       <td><button class="tiny" onclick="toggleCompare('${x.symbol}')">${isExp?'\u2212':'+'}</button></td>
       <td class="${isTop(x.symbol)?'top-coin':''}">${x.symbol}${isTop(x.symbol)?' <span class="badge top">TOP</span>':''}</td>
