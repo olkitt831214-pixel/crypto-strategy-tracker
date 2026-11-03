@@ -303,7 +303,7 @@ function checkSignal(c,f,s,conf,u200){
     if(ff&&ss&&ff>ss&&(!u200||(s2&&p>s2)))d++; else break;
   }
   const btcData=coinData['BTCUSDT'];
-  const btc=btcData? (btcData.closes.at(-1)>sma(btcData.closes,200) && sma(btcData.closes,15)>sma(btcData.closes,40)) : true;
+  const btc=btcData? (btcData.closes.at(-1)>sma(btcData.closes,200) && sma(btcData.closes,f)>sma(btcData.closes,s)) : true;
   let status='none';
   if(d>=conf && btc && slope100)status='triggered';
   else if(d>=conf-1 && d>0 && slope100)status='emerging';
@@ -317,22 +317,30 @@ async function fetchCoin(s){
   };
 }
 async function fetchCgPrices(){
-  const ids = Object.values(CG_IDS).join(',');
-  try {
-    const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
-    const data = await r.json();
-    for(const [sym, id] of Object.entries(CG_IDS)){
-      if(data[id] && data[id].usd) cgPrices[sym] = data[id].usd;
-    }
-  } catch(e) {}
+  const ids = Object.values(CG_IDS);
+  const batchSize = 10;
+  for(let i = 0; i < ids.length; i += batchSize){
+    const batch = ids.slice(i, i + batchSize);
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${batch.join(',')}&vs_currencies=usd`;
+    try {
+      const r = await fetch(url);
+      if(!r.ok) continue;
+      const data = await r.json();
+      for(const [sym, id] of Object.entries(CG_IDS)){
+        if(data[id] && data[id].usd) cgPrices[sym] = data[id].usd;
+      }
+      await new Promise(res => setTimeout(res, 300));
+    } catch(e) {}
+  }
 }
 async function fetchAlt(symbol){
   const id = CG_IDS[symbol];
   if(!id) return null;
   try {
     const r = await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=365&interval=daily`);
+    if(!r.ok) return null;
     const data = await r.json();
-    if(data.prices){
+    if(data.prices && data.prices.length > 40){
       return data.prices.map(p => p[1]);
     }
     return null;
@@ -355,13 +363,14 @@ function renderTable(){
     const cgPrice = cgPrices[x.symbol];
     const binanceBad = isBadData(x.binancePrice, cgPrice);
     const cgBad = false;
-    // Always use CoinGecko price if Binance is bad and we have a CG price
+    // Prefer CoinGecko price and signal when Binance is bad
     const usePrice = (binanceBad && cgPrice) ? cgPrice : x.binancePrice;
     const useSig = (binanceBad && x.cgSig) ? x.cgSig : x;
+    const priceNote = (binanceBad && cgPrice) ? ' <span style="color:#8dc647;font-size:0.65rem">(CG)</span>' : '';
     let html = `<tr>
       <td><button class="tiny" onclick="toggleCompare('${x.symbol}')">${isExp?'\u2212':'+'}</button></td>
       <td class="${isTop(x.symbol)?'top-coin':''}">${x.symbol}${isTop(x.symbol)?' <span class="badge top">TOP</span>':''}</td>
-      <td>$${usePrice?.toFixed(2)||'-'}</td>
+      <td>$${usePrice?.toFixed(2)||'-'}${priceNote}</td>
       <td class="${useSig.maOk?'check':'cross'}">${useSig.maOk?'\u2713':'\u2717'}</td>
       <td class="${useSig.days>=settings.confirm?'check':useSig.days>0?'partial':'cross'}">${useSig.days}/${settings.confirm}</td>
       <td class="${useSig.above200?'check':'cross'}">${settings.sma200?(useSig.above200?'\u2713':'\u2717'):'-'}</td>
@@ -392,8 +401,9 @@ function renderTable(){
   }).join('');
 }
 async function refresh(){
-  document.getElementById('triggered-list').innerHTML='<div class="loading">Loading...</div>';
+  document.getElementById('triggered-list').innerHTML='<div class="loading">Loading prices...</div>';
   await fetchCgPrices();
+  document.getElementById('triggered-list').innerHTML='<div class="loading">Loading Binance data...</div>';
   for(const s of COINS){try{coinData[s]=await fetchCoin(s);}catch(e){}}
   let r=COINS.filter(s=>coinData[s]).map(s=>{
     const d=coinData[s];
@@ -405,13 +415,15 @@ async function refresh(){
     const binanceBad = isBadData(sig.price, cgPrice);
     return {symbol, ...sig, binancePrice:sig.price, vol24, vol30, binanceBad, cgPrice};
   });
-  // Fetch CoinGecko history for coins where Binance is bad
-  for(const x of r){
-    if(x.binanceBad && !altData[x.symbol]){
-      altData[x.symbol] = await fetchAlt(x.symbol);
-    }
+  // Fetch CoinGecko history only for bad-Binance coins, with delay
+  const badCoins = r.filter(x => x.binanceBad && !altData[x.symbol]);
+  for(let i = 0; i < badCoins.length; i++){
+    const x = badCoins[i];
+    document.getElementById('triggered-list').innerHTML=`<div class="loading">Loading CoinGecko history (${i+1}/${badCoins.length})...</div>`;
+    altData[x.symbol] = await fetchAlt(x.symbol);
+    await new Promise(res => setTimeout(res, 400));
   }
-  // Use CoinGecko signal when Binance is bad
+  // Use CoinGecko signal when Binance is bad and history is available
   r.forEach(x => {
     if(x.binanceBad && altData[x.symbol] && altData[x.symbol].length > 40){
       x.cgSig = checkSignal(altData[x.symbol], settings.fast, settings.slow, settings.confirm, settings.sma200);
@@ -421,7 +433,9 @@ async function refresh(){
       x.above200 = x.cgSig.above200;
       x.slope100 = x.cgSig.slope100;
       x.roc = x.cgSig.roc;
-      x.price = x.cgSig.price;
+      x.price = x.cgSig.price || x.cgPrice;
+    } else if(x.binanceBad && x.cgPrice){
+      x.price = x.cgPrice;
     }
   });
   const ranked=r.filter(x=>x.status==='triggered'||x.status==='emerging').sort((a,b)=>b.roc-a.roc);
