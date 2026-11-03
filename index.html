@@ -64,6 +64,9 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 .atr-table td { padding:4px 8px; border-bottom:1px solid var(--border); }
 .atr-calc { background:var(--bg); border-radius:8px; padding:10px; margin-top:10px; font-size:0.85rem; }
 .atr-calc label { font-size:0.75rem; color:var(--muted); }
+.recommend { margin-top:8px; padding:8px; border-radius:6px; font-weight:600; }
+.recommend.use-atr { background:rgba(34,197,94,0.15); color:var(--green); }
+.recommend.use-hard { background:rgba(234,179,8,0.15); color:var(--yellow); }
 </style>
 </head>
 <body>
@@ -85,12 +88,17 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 </div>
 <div class="atr-calc" id="atr-calc">
   <div class="form-row">
-    <span style="color:var(--muted)">Variable ATR Stops:</span>
+    <span style="color:var(--muted)">ATR Stops:</span>
     <span>2.5× <input type="number" id="stop-25" readonly style="width:80px"></span>
     <span>1.5× <input type="number" id="stop-15" readonly style="width:80px"></span>
     <span>1.0× <input type="number" id="stop-10" readonly style="width:80px"></span>
     <span id="profit-label" style="color:var(--muted)"></span>
   </div>
+  <div class="form-row" style="margin-top:8px">
+    <span style="color:var(--muted)">30% Hard Stop:</span>
+    <input type="number" id="stop-hard" readonly style="width:90px">
+  </div>
+  <div id="recommend" class="recommend" style="display:none"></div>
 </div>
 <div style="overflow-x:auto"><table class="log-table"><thead><tr><th>Date</th><th>Coin</th><th>Entry</th><th>Exit</th><th>ATR</th><th>Size</th><th>P/L</th><th>P/L %</th><th>Note</th><th></th></tr></thead><tbody id="log-body"></tbody></table></div></div></div>
 <div id="rules" class="panel"><div class="card"><h2>Strategy Rules</h2>
@@ -195,9 +203,24 @@ function calcStops(){
   }
   const profit = (current / entry - 1) * 100;
   document.getElementById('profit-label').textContent = 'Profit: ' + profit.toFixed(1) + '%';
-  document.getElementById('stop-25').value = (current - 2.5 * atr).toFixed(2);
-  document.getElementById('stop-15').value = (current - 1.5 * atr).toFixed(2);
-  document.getElementById('stop-10').value = (current - 1.0 * atr).toFixed(2);
+  const stop25 = current - 2.5 * atr;
+  const stop15 = current - 1.5 * atr;
+  const stop10 = current - 1.0 * atr;
+  const hardStop = entry * 0.7;
+  document.getElementById('stop-25').value = stop25.toFixed(2);
+  document.getElementById('stop-15').value = stop15.toFixed(2);
+  document.getElementById('stop-10').value = stop10.toFixed(2);
+  document.getElementById('stop-hard').value = hardStop.toFixed(2);
+  // Recommend the higher of 2.5x ATR vs hard stop
+  const rec = document.getElementById('recommend');
+  rec.style.display = 'block';
+  if(stop25 >= hardStop){
+    rec.className = 'recommend use-atr';
+    rec.textContent = 'Use 2.5× ATR stop ($' + stop25.toFixed(2) + ') — it is higher than the 30% hard stop';
+  } else {
+    rec.className = 'recommend use-hard';
+    rec.textContent = 'Use 30% hard stop ($' + hardStop.toFixed(2) + ') — it is higher than the 2.5× ATR stop';
+  }
 }
 function isRising(closes, period, lookback){
   if(closes.length < period + lookback) return false;
@@ -280,7 +303,9 @@ function addLog(){
   document.getElementById('stop-25').value='';
   document.getElementById('stop-15').value='';
   document.getElementById('stop-10').value='';
+  document.getElementById('stop-hard').value='';
   document.getElementById('profit-label').textContent='';
+  document.getElementById('recommend').style.display='none';
   renderLog();
 }
 function renderLog(){
