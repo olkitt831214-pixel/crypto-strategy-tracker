@@ -59,10 +59,12 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 .rules-list h3 { font-size:1rem; margin:16px 0 8px; color:var(--accent); }
 .rules-list li { margin-bottom:8px; }
 .rules-list strong { color:var(--text); }
+.atr-table { width:100%; font-size:0.85rem; margin-top:8px; }
+.atr-table td { padding:4px 8px; border-bottom:1px solid var(--border); }
 </style>
 </head>
 <body>
-<div class="header"><div><h1>Crypto Strategy Tracker</h1><div class="subtitle">15/40 SMA + 3-day confirm + 200 SMA + 100 SMA rising (15d) + BTC filter</div></div><div><button onclick="refresh()">Refresh</button> <button class="secondary" onclick="exportLog()">Export</button></div></div>
+<div class="header"><div><h1>Crypto Strategy Tracker</h1><div class="subtitle">15/40 SMA + 3-day confirm + 200 SMA + 100 SMA rising (15d) + BTC filter + Variable ATR</div></div><div><button onclick="refresh()">Refresh</button> <button class="secondary" onclick="exportLog()">Export</button></div></div>
 <div class="tabs"><button class="tab active" onclick="showTab('signals')">Signals</button><button class="tab" onclick="showTab('log')">Trade Log</button><button class="tab" onclick="showTab('rules')">Rules</button><button class="tab" onclick="showTab('settings')">Settings</button></div>
 <div id="signals" class="panel active"><div class="stats" id="stats"></div><div class="grid"><div class="card"><h2>Triggered (ranked by 30d ROC) <span class="badge green" id="triggered-count">0</span></h2><div id="triggered-list"><div class="loading">Loading...</div></div></div><div class="card"><h2>Emerging (ranked by 30d ROC) <span class="badge yellow" id="emerging-count">0</span></h2><div id="emerging-list"><div class="loading">Loading...</div></div></div></div><div class="card"><h2>Condition Status</h2><div style="overflow-x:auto"><table class="cond-table" id="cond-table"><thead><tr><th>Coin</th><th>Price</th><th>15>40</th><th>Days</th><th>>200</th><th>100↑</th><th>BTC</th><th>30d ROC</th><th>24h Vol</th><th>30d Avg Vol</th><th>Priority</th><th>Status</th></tr></thead><tbody id="cond-body"></tbody></table></div></div></div>
 <div id="log" class="panel"><div class="card"><h2>Log a Trade</h2>
@@ -70,12 +72,12 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
   <select id="log-coin"></select>
   <input type="number" id="log-entry" placeholder="Entry Price" step="0.01" style="width:110px">
   <input type="number" id="log-exit" placeholder="Exit Price" step="0.01" style="width:110px">
-  <input type="number" id="log-atr" placeholder="2.5x ATR" step="0.01" style="width:100px">
+  <input type="number" id="log-atr" placeholder="ATR value" step="0.01" style="width:100px">
   <input type="number" id="log-size" placeholder="Size ($)" step="0.01" style="width:90px">
   <input type="text" id="log-note" placeholder="Note" style="width:120px">
   <button onclick="addLog()">Add</button>
 </div>
-<div style="overflow-x:auto"><table class="log-table"><thead><tr><th>Date</th><th>Coin</th><th>Entry</th><th>Exit</th><th>2.5x ATR</th><th>Size</th><th>P/L</th><th>P/L %</th><th>Note</th><th></th></tr></thead><tbody id="log-body"></tbody></table></div></div></div>
+<div style="overflow-x:auto"><table class="log-table"><thead><tr><th>Date</th><th>Coin</th><th>Entry</th><th>Exit</th><th>ATR</th><th>Size</th><th>P/L</th><th>P/L %</th><th>Note</th><th></th></tr></thead><tbody id="log-body"></tbody></table></div></div></div>
 <div id="rules" class="panel"><div class="card"><h2>Strategy Rules</h2>
 <div class="rules-list">
 <h3>Entry Conditions (all must be true at the daily close)</h3>
@@ -91,7 +93,15 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 <li><strong>15-day SMA falls below 40-day SMA</strong> — Short-term momentum has reversed.</li>
 <li><strong>Price closes below 200-day SMA</strong> — The longer-term uptrend has ended.</li>
 <li><strong>30% hard stop</strong> — Price closes 30% or more below the entry price.</li>
-<li><strong>2.5× ATR trailing stop</strong> — A trailing stop set at 2.5 times the Average True Range below the current price. Rises as price rises; never falls.</li>
+<li><strong>Variable ATR trailing stop (aggressive)</strong> — A trailing stop that tightens as profits increase:
+  <table class="atr-table">
+    <tr><td>Profit</td><td>ATR Multiple</td></tr>
+    <tr><td>Below +25%</td><td>2.5× ATR</td></tr>
+    <tr><td>+25% to +50%</td><td>1.5× ATR</td></tr>
+    <tr><td>Above +50%</td><td>1.0× ATR</td></tr>
+  </table>
+  The stop only moves up, never down. This locks in more of the winners as the trade progresses.
+</li>
 </ul>
 <h3>Additional Guidance</h3>
 <ul>
