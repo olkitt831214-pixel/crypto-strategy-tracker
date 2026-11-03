@@ -71,9 +71,9 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 .recommend.use-hard { background:rgba(234,179,8,0.15); color:var(--yellow); }
 .pl-box { background:var(--bg); border-radius:8px; padding:10px; margin-top:8px; }
 .compare-row { background:var(--bg); }
-.compare-row td { font-size:0.7rem; color:var(--muted); }
-.source-binance { color:#f0b90b; }
-.source-yahoo { color:#7b2ff7; }
+.compare-row td { font-size:0.7rem; }
+.source-binance { color:#f0b90b; font-weight:600; }
+.source-cg { color:#8dc647; font-weight:600; }
 </style>
 </head>
 <body>
@@ -181,8 +181,9 @@ input, select { background:var(--bg); border:1px solid var(--border); color:var(
 <script>
 const TOP13=['BTC','ETH','BNB','SOL','XRP','ADA','DOGE','AVAX','DOT','LINK','ATOM','LTC','BCH'];
 const COINS=['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','LINKUSDT','ATOMUSDT','LTCUSDT','BCHUSDT','AAVEUSDT','ALGOUSDT','NEARUSDT','ICPUSDT','FILUSDT','ETCUSDT','XLMUSDT','VETUSDT','THETAUSDT','EOSUSDT','TRXUSDT','XTZUSDT','NEOUSDT','IOTAUSDT','ZECUSDT','DASHUSDT','WAVESUSDT','ZILUSDT','BATUSDT','MANAUSDT','SANDUSDT','AXSUSDT','ENJUSDT','CHZUSDT','HBARUSDT','QNTUSDT','EGLDUSDT','FLOWUSDT','KSMUSDT'];
+const CG_IDS = {BTC:'bitcoin',ETH:'ethereum',BNB:'binancecoin',SOL:'solana',XRP:'ripple',ADA:'cardano',DOGE:'dogecoin',AVAX:'avalanche-2',DOT:'polkadot',LINK:'chainlink',ATOM:'cosmos',LTC:'litecoin',BCH:'bitcoin-cash',AAVE:'aave',ALGO:'algorand',NEAR:'near',ICP:'internet-computer',FIL:'filecoin',ETC:'ethereum-classic',XLM:'stellar',VET:'vechain',THETA:'theta-token',EOS:'eos',TRX:'tron',XTZ:'tezos',NEO:'neo',IOTA:'iota',ZEC:'zcash',DASH:'dash',WAVES:'waves',ZIL:'zilliqa',BAT:'basic-attention-token',MANA:'decentraland',SAND:'the-sandbox',AXS:'axie-infinity',ENJ:'enjincoin',CHZ:'chiliz',HBAR:'hedera-hashgraph',QNT:'quant-network',EGLD:'elrond-erd-2',FLOW:'flow',KSM:'kusama'};
 const VOL_THRESHOLD = 10000000;
-let settings={fast:15,slow:40,confirm:3,sma200:true}, log=JSON.parse(localStorage.getItem('tradeLog')||'[]'), coinData={}, yahooData={}, expanded={};
+let settings={fast:15,slow:40,confirm:3,sma200:true}, log=JSON.parse(localStorage.getItem('tradeLog')||'[]'), coinData={}, altData={}, expanded={};
 function isTop(symbol){return TOP13.includes(symbol);}
 function showTab(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');event.target.classList.add('active');if(id==='log')renderLog();}
 function sma(a,n){if(!a||a.length<n)return null;return a.slice(-n).reduce((x,y)=>x+y,0)/n;}
@@ -307,21 +308,24 @@ async function fetchCoin(s){
     volumes: data.map(d=>parseFloat(d[7]))
   };
 }
-async function fetchYahoo(symbol){
-  const yahooSymbol = symbol.replace('USDT','') + '-USD';
+async function fetchAlt(symbol){
+  const id = CG_IDS[symbol];
+  if(!id) return null;
   try {
-    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1y`);
+    const r = await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=365&interval=daily`);
     const data = await r.json();
-    const closes = data.chart.result[0].indicators.quote[0].close.filter(c => c !== null);
-    return closes;
+    if(data.prices){
+      return data.prices.map(p => p[1]);
+    }
+    return null;
   } catch(e) {
     return null;
   }
 }
 async function toggleCompare(symbol){
   expanded[symbol] = !expanded[symbol];
-  if(expanded[symbol] && !yahooData[symbol]){
-    yahooData[symbol] = await fetchYahoo(symbol + 'USDT');
+  if(expanded[symbol] && !altData[symbol]){
+    altData[symbol] = await fetchAlt(symbol);
   }
   renderTable();
 }
@@ -346,13 +350,13 @@ function renderTable(){
       <td><span class="badge ${x.status==='triggered'?'green':x.status==='emerging'?'yellow':''}">${x.status}</span></td>
     </tr>`;
     if(isExp){
-      const yCloses = yahooData[x.symbol];
-      const ySig = yCloses ? checkSignal(yCloses, settings.fast, settings.slow, settings.confirm, settings.sma200) : null;
-      html += `<tr class="compare-row"><td></td><td class="source-binance">Binance</td><td>$${x.price?.toFixed(4)||'-'}</td><td>${x.maOk?'\u2713':'\u2717'} (${x.sma15?.toFixed(4)} / ${x.sma40?.toFixed(4)})</td><td colspan="9"></td></tr>`;
-      if(ySig){
-        html += `<tr class="compare-row"><td></td><td class="source-yahoo">Yahoo</td><td>$${ySig.price?.toFixed(4)||'-'}</td><td>${ySig.maOk?'\u2713':'\u2717'} (${ySig.sma15?.toFixed(4)} / ${ySig.sma40?.toFixed(4)})</td><td colspan="9"></td></tr>`;
+      html += `<tr class="compare-row"><td></td><td class="source-binance">Binance</td><td>$${x.price?.toFixed(4)||'-'}</td><td class="${x.maOk?'check':'cross'}">${x.maOk?'\u2713':'\u2717'}</td><td>${x.days}/${settings.confirm}</td><td class="${x.above200?'check':'cross'}">${x.above200?'\u2713':'\u2717'}</td><td class="${x.slope100?'check':'cross'}">${x.slope100?'\u2713':'\u2717'}</td><td class="${x.btc?'check':'cross'}">${x.btc?'\u2713':'\u2717'}</td><td>${(x.roc*100).toFixed(1)}%</td><td colspan="4"></td></tr>`;
+      const aCloses = altData[x.symbol];
+      if(aCloses && aCloses.length > 40){
+        const aSig = checkSignal(aCloses, settings.fast, settings.slow, settings.confirm, settings.sma200);
+        html += `<tr class="compare-row"><td></td><td class="source-cg">CoinGecko</td><td>$${aSig.price?.toFixed(4)||'-'}</td><td class="${aSig.maOk?'check':'cross'}">${aSig.maOk?'\u2713':'\u2717'}</td><td>${aSig.days}/${settings.confirm}</td><td class="${aSig.above200?'check':'cross'}">${aSig.above200?'\u2713':'\u2717'}</td><td class="${aSig.slope100?'check':'cross'}">${aSig.slope100?'\u2713':'\u2717'}</td><td class="${aSig.btc?'check':'cross'}">${aSig.btc?'\u2713':'\u2717'}</td><td>${(aSig.roc*100).toFixed(1)}%</td><td colspan="4"></td></tr>`;
       } else {
-        html += `<tr class="compare-row"><td></td><td class="source-yahoo">Yahoo</td><td colspan="11">Failed to load</td></tr>`;
+        html += `<tr class="compare-row"><td></td><td class="source-cg">CoinGecko</td><td colspan="11">Failed to load</td></tr>`;
       }
     }
     return html;
