@@ -404,6 +404,13 @@ async function refresh(){
     const binanceBad = isBadData(sig.price, cgPrice);
     return {symbol, ...sig, binancePrice:sig.price, vol24, vol30, binanceBad, cgPrice};
   });
+  // Fetch CoinGecko history for coins where Binance is bad
+  for(const x of r){
+    if(x.binanceBad && !altData[x.symbol]){
+      altData[x.symbol] = await fetchAlt(x.symbol);
+    }
+  }
+  // Use CoinGecko signal when Binance is bad
   r.forEach(x => {
     if(x.binanceBad && altData[x.symbol] && altData[x.symbol].length > 40){
       x.cgSig = checkSignal(altData[x.symbol], settings.fast, settings.slow, settings.confirm, settings.sma200);
@@ -413,6 +420,7 @@ async function refresh(){
       x.above200 = x.cgSig.above200;
       x.slope100 = x.cgSig.slope100;
       x.roc = x.cgSig.roc;
+      x.price = x.cgSig.price;
     }
   });
   const ranked=r.filter(x=>x.status==='triggered'||x.status==='emerging').sort((a,b)=>b.roc-a.roc);
